@@ -34,6 +34,7 @@ EMSCRIPTEN_KEEPALIVE void x4_set_aa(int on) { extern int gpu_aa; gpu_aa = on; }
 EMSCRIPTEN_KEEPALIVE uint8_t *x4_card(void) { return memcard; }
 EMSCRIPTEN_KEEPALIVE void x4_card_new(void) { memcard_new(); }
 EMSCRIPTEN_KEEPALIVE void x4_test_save(int on) { card_test_save = on; }
+EMSCRIPTEN_KEEPALIVE void x4_full_toggle(void) { cheat_full_toggle(); }
 
 // HD (ver hd.c y web/hd.js): la página lo activa si su GPU puede y si el servidor local tiene
 // el paquete HD; entonces cada frame se manda como lista de dibujo en vez de como imagen.
@@ -72,6 +73,18 @@ EM_JS(void, js_present, (const uint8_t *rgba, int w, int h, long frame, int vide
     postMessage({type: 'frame', w, h, frame, video, wide, buf: px.buffer}, [px.buffer]);
 });
 
+// Caja de diálogo en pantalla (voice.c): la página pone su voz y su subtítulo.
+EM_JS(void, js_voice, (uint32_t key), {
+    if (typeof WorkerGlobalScope === 'undefined') return;
+    postMessage({type: 'voice', key: (key >>> 0).toString(16).padStart(8, '0')});
+});
+
+// Selección de personaje y modo Completo (cheats.c), para el aviso de la página.
+EM_JS(void, js_cheat_state, (int state), {
+    if (typeof WorkerGlobalScope === 'undefined') return;
+    postMessage({type: 'cheat', state});
+});
+
 EM_JS(void, js_audio, (const int16_t *pcm, int n), {
     if (typeof WorkerGlobalScope === 'undefined') return;
     const s = HEAP16.slice(pcm >> 1, (pcm >> 1) + n * 2);
@@ -96,6 +109,12 @@ void frame_hook(long frame) {
     int n = audio_take(pcm, 4096);
     if (n) js_audio(pcm, n);
     if (memcard_dirty) { memcard_dirty = 0; js_card_save(memcard, sizeof memcard); }
+    static uint32_t last_voice;
+    uint32_t vk = voice_frame();
+    if (vk != last_voice) { last_voice = vk; js_voice(vk); }
+    static int last_cheat = -1;
+    int cs = cheat_state();
+    if (cs != last_cheat) { last_cheat = cs; js_cheat_state(cs); }
     // Dormir también procesa los mensajes del hilo principal (mando, pausa, créditos).
     if (credits >= 0) {
         while (credits == 0 || paused) emscripten_sleep(paused ? 50 : 1);

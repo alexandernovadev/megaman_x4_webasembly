@@ -43,6 +43,8 @@ onmessage = (e) => {
     Module._x4_set_aa(m.on ? 1 : 0);
   } else if (m.type === 'wide') {
     Module._x4_set_widescreen(m.on ? 1 : 0);
+  } else if (m.type === 'full') {
+    Module._x4_full_toggle();
   } else if (m.type === 'pause') {
     Module._x4_set_paused(m.paused ? 1 : 0);
   }

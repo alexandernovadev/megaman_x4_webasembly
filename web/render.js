@@ -331,6 +331,12 @@ function createRenderer(canvas) {
     get filter() { return filter; },
     setEnhanceVideo(on) { enhanceVideo = !!on; draw(); },
     redraw: draw,
+    // Dónde está la imagen del juego en la página (px CSS) y su tamaño en píxeles de la PS1.
+    geometry() {
+      const s = canvas.getBoundingClientRect().width / Math.max(1, canvas.width);
+      return { x: view.x * s, y: view.y * s, w: view.w * s, h: view.h * s, fw: w, fh: h,
+               margin: wide ? (w - 320) / 2 : 0 };
+    },
   };
 }
 

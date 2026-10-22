@@ -31,6 +31,26 @@
   #keys { color: var(--muted); font-size: 13px; text-align: center; }
   kbd { background: #1f2533; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
     padding: 0 5px; font: 12px ui-monospace, monospace; color: var(--text); }
+  #badge { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); pointer-events: none;
+    background: rgba(8, 10, 16, .82); border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px;
+    font-size: clamp(11px, 1.8vw, 15px); white-space: nowrap; color: var(--text); }
+  #badge.on { border-color: #e8b631; color: #ffd75e; box-shadow: 0 0 18px rgba(232, 182, 49, .35); }
+  #badge.on b { color: #fff; }
+  /* Subtítulo en español: tapa la caja de diálogo del juego con una igual (ver showVoice). */
+  #subs { position: absolute; pointer-events: none; box-sizing: border-box; overflow: hidden;
+    background: linear-gradient(#123a7a, #0a2150 55%, #06163a); border: 1px solid #9fd2ff;
+    box-shadow: inset 0 0 0 1px #0b2a5c; border-radius: 2px; color: #fff; line-height: 1.25;
+    padding: .35em .6em; text-shadow: 1px 1px 0 #000; font-family: system-ui, sans-serif; }
+  #subs b { display: block; letter-spacing: .08em; font-size: .9em; color: #fff; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px 24px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  dialog h2 { margin: 0 0 4px; font-size: 19px; }
+  dialog h3 { margin: 18px 0 4px; font-size: 15px; color: var(--accent); }
+  dialog p, dialog ul { margin: 4px 0; color: var(--muted); }
+  dialog ul { padding-left: 20px; }
+  dialog li b, dialog p b { color: var(--text); }
+  dialog .close { float: right; }
   #screen:fullscreen { width: 100vw !important; height: 100vh !important; aspect-ratio: auto !important; border: 0; border-radius: 0; }
 </style>
 </head>
@@ -46,19 +66,49 @@
     <p>O arrástralo aquí. Necesitas tu propia copia del disco en formato <code>.bin</code> (2352 bytes por sector).
       Se lee desde tu equipo, en tu navegador: no se sube a ningún sitio.</p>
   </div>
+  <div id="badge" hidden></div>
+  <div id="subs" hidden></div>
 </div>
 
 <div id="bar">
   <span id="status">Cargando el motor…</span>
   <span id="fps"></span>
   <button id="pause" disabled>Pausa (P)</button>
-  <button id="full">Pantalla completa (F)</button>
+  <button id="full">Pantalla completa (⌘+Enter)</button>
+  <button id="tricks">Trucos</button>
 </div>
+
+<dialog id="trickbox">
+  <button class="close" id="trickclose">Cerrar</button>
+  <h2>Trucos</h2>
+  <p>Todos se hacen en la pantalla <b>PLAYER SELECT</b>, al empezar una partida nueva.</p>
+
+  <h3>Versión Completa (X o Zero)</h3>
+  <p>Con el cursor sobre X o Zero, pulsa <kbd>Tab</kbd>. Abajo aparece el aviso dorado; vuelve a
+    pulsar <kbd>Tab</kbd> para quitarlo. Después elige el personaje como siempre. Empiezas como si ya
+    hubieras recogido todo, pero con los 8 jefes por vencer:</p>
+  <ul>
+    <li><b>X Completo:</b> la Ultimate Armor (Nova Strike sin límite, disparo de plasma, planeo y
+      menos daño), las 8 armas, la vida al máximo y los 4 tanques llenos.</li>
+    <li><b>Zero Completo:</b> Zero Negro, las 8 técnicas, la vida al máximo y los 4 tanques llenos.</li>
+  </ul>
+  <p>Se guarda con la partida: al cargarla sigues teniéndolo todo.</p>
+
+  <h3>Ultimate Armor (código original del juego)</h3>
+  <p>Cursor sobre X: <kbd>Z</kbd> <kbd>Z</kbd>, <kbd>←</kbd> 6 veces, y luego mantén
+    <kbd>A</kbd> + <kbd>E</kbd> mientras pulsas <kbd>Enter</kbd>.</p>
+  <p>Solo da la armadura: las armas, los corazones y los tanques hay que conseguirlos.</p>
+
+  <h3>Zero Negro (código original del juego)</h3>
+  <p>Cursor sobre Zero: mantén <kbd>D</kbd> y pulsa <kbd>→</kbd> 6 veces; suelta <kbd>D</kbd>,
+    mantén <kbd>Z</kbd> y pulsa <kbd>Enter</kbd>.</p>
+  <p>Solo cambia el color: Zero se juega igual.</p>
+</dialog>
 
 <div id="keys">
   <kbd>↑↓←→</kbd> mover · <kbd>Z</kbd> dash (◯) · <kbd>X</kbd> saltar (✕) · <kbd>C</kbd> disparo/espada (▢) · <kbd>V</kbd> △ ·
   <kbd>A</kbd>/<kbd>D</kbd> L1/R1 · <kbd>Q</kbd>/<kbd>E</kbd> L2/R2 · <kbd>Enter</kbd> Start ·
-  <kbd>Shift</kbd> Select · o un mando
+  <kbd>Shift</kbd> Select · o un mando · <kbd>Tab</kbd> versión Completa (en la selección de personaje)
 </div>
 
 <script src="anime4k.js"></script>
@@ -127,14 +177,16 @@ class XA extends AudioWorkletProcessor {
   }
 }
 registerProcessor('xa', XA);`;
-let audioCtx = null, audioNode = null;
+let audioCtx = null, audioNode = null, gameGain = null;
 async function startAudio() {
   if (audioCtx) { if (!paused) audioCtx.resume(); return; }
   audioCtx = new AudioContext({ sampleRate: 44100 });
   const url = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
   await audioCtx.audioWorklet.addModule(url);
   audioNode = new AudioWorkletNode(audioCtx, 'xa', { outputChannelCount: [2] });
-  audioNode.connect(audioCtx.destination);
+  // La música y los efectos pasan por gameGain, que baja mientras suena una voz (duck).
+  gameGain = audioCtx.createGain();
+  audioNode.connect(gameGain).connect(audioCtx.destination);
   audioNode.port.onmessage = (e) => { window.audioStats = e.data; };
 }
 // Los navegadores solo dejan sonar audio tras un gesto del usuario.
@@ -191,6 +243,10 @@ worker.onmessage = (e) => {
     renderer.frame(m.buf, m.w, m.h, m.video, m.wide);
     perfNote(t, performance.now() - t);
     frames++; lastFrame = m.frame;
+  } else if (m.type === 'voice') {
+    showVoice(m.key);
+  } else if (m.type === 'cheat') {
+    showCheat(m.state);
   } else if (m.type === 'ready') {
     engineReady = true;
     if (pendingFile) launch(pendingFile);
@@ -276,15 +332,88 @@ function togglePause() {
   paused = !paused;
   worker.postMessage({ type: 'pause', paused });
   if (audioCtx) paused ? audioCtx.suspend() : audioCtx.resume();
+  if (voiceAudio && !voiceAudio.ended) paused ? voiceAudio.pause() : voiceAudio.play().catch(() => {});
   $('pause').textContent = paused ? 'Seguir (P)' : 'Pausa (P)';
 }
 $('pause').onclick = togglePause;
 const fullscreen = () => document.fullscreenElement ? document.exitFullscreen() : $('screen').requestFullscreen();
 $('full').onclick = fullscreen;
 
+// Voces en español (tools/voice/, servidas desde voice_pack/): el juego avisa de cada caja de
+// diálogo nueva con la huella de su texto. Si está doblada, suena su audio y su subtítulo tapa
+// la caja en inglés (en píxeles de la PS1: x 37-283, y 25-94).
+let voiceIndex = {}, voiceAudio = null, voiceKey = '00000000';
+fetch('voice/index.json').then((r) => r.ok ? r.json() : {}).then((j) => { voiceIndex = j; }).catch(() => {});
+function placeSubs() {
+  const g = renderer.geometry(), sx = g.w / (g.fw || 320), sy = g.h / (g.fh || 240), el = $('subs');
+  Object.assign(el.style, { left: `${g.x + (37 + g.margin) * sx}px`, top: `${g.y + 25 * sy}px`,
+    width: `${246 * sx}px`, height: `${69 * sy}px`, fontSize: `${10.5 * sy}px` });
+}
+// Mientras habla un personaje, la música y los efectos bajan al 30%.
+function duck(on) {
+  if (gameGain) gameGain.gain.setTargetAtTime(on ? 0.3 : 1, audioCtx.currentTime, 0.12);
+}
+function stopVoice() {
+  if (voiceAudio) { voiceAudio.pause(); voiceAudio = null; }
+  duck(false);
+}
+function showVoice(key) {
+  voiceKey = key;
+  const e = voiceIndex[key], el = $('subs');
+  if (!e) {
+    el.hidden = true;
+    // Otra caja sin doblar: se calla; al cerrar el diálogo, la última frase termina.
+    if (key !== '00000000') stopVoice();
+    return;
+  }
+  el.innerHTML = '';
+  const who = document.createElement('b');
+  who.textContent = e.who;
+  el.append(who, e.es);
+  placeSubs();
+  el.hidden = false;
+  if (e.audio) {
+    if (voiceAudio) voiceAudio.pause();
+    const a = voiceAudio = new Audio(`voice/${e.audio}`);
+    a.addEventListener('playing', () => duck(true));
+    a.addEventListener('ended', () => { if (voiceAudio === a) duck(false); });
+    if (!paused) voiceAudio.play().catch(() => {});
+  }
+}
+addEventListener('resize', () => { if (!$('subs').hidden) placeSubs(); });
+document.addEventListener('fullscreenchange', () => setTimeout(() => { if (!$('subs').hidden) placeSubs(); }, 100));
+
+// Aviso del modo Completo en la selección de personaje (bits: en la selección, activo, Zero).
+function showCheat(state) {
+  const badge = $('badge');
+  badge.hidden = !(state & 1);
+  badge.classList.toggle('on', !!(state & 2));
+  const who = state & 4 ? 'Zero' : 'X';
+  badge.innerHTML = state & 2
+    ? `★ <b>${who} Completo</b> · ${state & 4 ? 'Zero Negro' : 'Ultimate Armor'} y todo recogido · Tab para quitar`
+    : 'Tab: versión Completa (todo recogido)';
+}
+
+// Trucos: el juego se pausa mientras está abierto.
+let pausedByTricks = false;
+$('tricks').onclick = () => {
+  if (started && !paused) { togglePause(); pausedByTricks = true; }
+  keyBits = 0;
+  $('trickbox').showModal();
+};
+$('trickclose').onclick = () => $('trickbox').close();
+$('trickbox').addEventListener('close', () => {
+  if (pausedByTricks && paused) togglePause();
+  pausedByTricks = false;
+  $('tricks').blur();  // si no, Enter (Start) volvería a abrirlo
+});
+
 addEventListener('keydown', (e) => {
+  if ($('trickbox').open) return;
+  if (e.code === 'Tab') { e.preventDefault(); if (started) worker.postMessage({ type: 'full' }); return; }
   if (e.code === 'KeyP' || e.code === 'Escape' && !document.fullscreenElement) { togglePause(); return; }
-  if (e.code === 'KeyF') { fullscreen(); return; }
+  // ⌘+Enter (Ctrl+Enter fuera de Mac): pantalla completa, sin pulsar Start.
+  if (e.code === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); fullscreen(); return; }
   const b = KEYS[e.code];
   if (b) { keyBits |= PAD[b]; e.preventDefault(); }
 });

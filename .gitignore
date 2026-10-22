@@ -15,7 +15,12 @@ web/x4.wasm
 # HD con IA: piezas generadas a partir de los gráficos del juego
 hd_pack/
 hd_queue/
+hd_captures/
 hd_preview/
+
+# Voces en español: guion traducido del texto del juego y audios generados a partir de él
+voice_lines/
+voice_pack/
 
 # Partidas guardadas (tarjeta de memoria)
 *.mcr

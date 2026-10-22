@@ -54,6 +54,12 @@ static void scripted_input(long frame) {
         else if (!strcmp(name, "up")) pad_buttons[0] |= PAD_UP;
         else if (!strcmp(name, "down")) pad_buttons[0] |= PAD_DOWN;
         else if (!strcmp(name, "square")) pad_buttons[0] |= PAD_SQUARE;
+        else if (!strcmp(name, "triangle")) pad_buttons[0] |= PAD_TRIANGLE;
+        else if (!strcmp(name, "l1")) pad_buttons[0] |= PAD_L1;
+        else if (!strcmp(name, "r1")) pad_buttons[0] |= PAD_R1;
+        else if (!strcmp(name, "l2")) pad_buttons[0] |= PAD_L2;
+        else if (!strcmp(name, "r2")) pad_buttons[0] |= PAD_R2;
+        else if (!strcmp(name, "select")) pad_buttons[0] |= PAD_SELECT;
     }
 }
 
@@ -112,6 +118,28 @@ void frame_hook(long frame) {
     static long acc;
     acc += n;
     if (getenv("X4_AUDIOSTAT") && frame % 60 == 0) { extern long cd_reads; static long last_reads; fprintf(stderr, "[audio] segundo %ld: %ld muestras, %ld sectores\n", frame / 60, acc, cd_reads - last_reads); last_reads = cd_reads; acc = 0; }
+    // X4_POKE="2000:801721f7=1,..." escribe ese byte en ese frame (pruebas).
+    const char *poke = getenv("X4_POKE");
+    if (poke) {
+        char buf[512];
+        snprintf(buf, sizeof buf, "%s", poke);
+        for (char *t = strtok(buf, ","); t; t = strtok(NULL, ",")) {
+            uint32_t a; unsigned v; long f;
+            if (sscanf(t, "%ld:%x=%x", &f, &a, &v) == 3 && f == frame) WR8(a, v);
+        }
+    }
+    // X4_VOICELOG: muestra la huella de cada caja de diálogo nueva (ver voice.c).
+    if (getenv("X4_VOICELOG")) {
+        static uint32_t last_voice;
+        uint32_t k = voice_frame();
+        if (k != last_voice) { fprintf(stderr, "[voz] %ld %08x\n", frame, k); last_voice = k; }
+    }
+    // X4_RAMDUMP="frame:archivo": guarda los 2 MB de RAM en ese frame (pruebas).
+    const char *rd = getenv("X4_RAMDUMP");
+    if (rd && atol(rd) == frame && strchr(rd, ':')) {
+        FILE *f = fopen(strchr(rd, ':') + 1, "wb");
+        if (f) { fwrite(ram, 1, sizeof ram, f); fclose(f); }
+    }
     // X4_PEEK="80139530,8013953c" imprime esas palabras de RAM cada X4_PEEK_EVERY frames (60).
     const char *peek = getenv("X4_PEEK");
     long every = getenv("X4_PEEK_EVERY") ? atol(getenv("X4_PEEK_EVERY")) : 60;
@@ -167,6 +195,7 @@ int main(int argc, char **argv) {
         else memcard_new();
     }
     if (getenv("X4_WIDE")) ws_set(1);
+    if (getenv("X4_FULL")) full_mode = 1;  // modo Completo (ver cheats.c)
     extern int gpu_aa;
     if (getenv("X4_NOAA")) gpu_aa = 0;
     if (getenv("X4_WAV") && (wav = fopen(getenv("X4_WAV"), "wb"))) { wav_header(); atexit(wav_close); }

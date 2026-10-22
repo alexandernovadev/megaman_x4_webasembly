@@ -39,6 +39,10 @@ PATCHES = {
     0x80028f34: 'c->r[5] = c->r[5] + (uint32_t)(368 + ws_reveal);',
     0x80028e80: 'c->r[4] = c->r[5] + (uint32_t)(-48 - ws_reveal);',
     0x80028f28: 'c->r[4] = c->r[5] + (uint32_t)(-48 - ws_reveal);',
+    # Armas de los jefes (0x80172219, que también marca los jefes vencidos): en el modo Completo
+    # el jugador (0x80035240) y el menú de pausa (0x8002FD70) las ven todas (ver cheats.c).
+    0x8003525c: 'c->r[4] = cheat_weapons(RD8(c->r[4] + (uint32_t)8729));',
+    0x8002ff54: 'c->r[2] = cheat_weapons(RD8(c->r[2] + (uint32_t)8729));',
 }
 
 # Ganchos al entrar en una función: `if (gancho(c, dirección)) return;` (1 = ya resuelta).
@@ -50,6 +54,9 @@ HOOKS = {
     0x8002b288: 'ws_hook_fixed_window',
     0x8002b3c0: 'ws_hook_fixed_window',
     0x8001a9ec: 'card_hook_menu',          # menú de cargar (atajo de prueba: abre el de guardar)
+    0x80029a48: 'cheat_hook_select',       # selección de personaje, cursor en X
+    0x80029bd8: 'cheat_hook_select',       # selección de personaje, cursor en Zero
+    0x80035240: 'cheat_hook_player',       # inicio del jugador al empezar un nivel (modo Completo)
 }
 
 NUM_FILES = 48

@@ -28,7 +28,7 @@ from spandrel import ModelLoader
 
 MODEL = os.path.expanduser('~/tools/hd-ai/models/4x-Fatal-Pixels.pth')
 SCALE = 8
-EDGE = 1  # píxeles HD del borde de la pieza que siguen la silueta original
+GROW = 4  # cuánto puede salirse la versión HD de la silueta original (píxeles HD)
 
 
 def c15(c):
@@ -112,15 +112,33 @@ class Upscaler:
                 alpha = res[1, :, y:y + rh, x:x + rw].mean(0).cpu().numpy() > 0.5
                 if t['flip'] & 1: col, alpha = col[:, ::-1], alpha[:, ::-1]
                 if t['flip'] & 2: col, alpha = col[::-1], alpha[::-1]
-                # Borde de la pieza: la silueta sigue a la original, para que no queden rendijas
-                # de un píxel con la vecina.
                 lr = (t['pal'][t['px']] != 0).repeat(SCALE, 0).repeat(SCALE, 1)
-                band = np.ones(alpha.shape, bool)
-                band[EDGE:-EDGE, EDGE:-EDGE] = False
-                alpha = np.where(band, lr, alpha)
+                # Solo la silueta de la propia pieza (con un margen para el borde suavizado): en la
+                # capa puede haber otras piezas que pisan su rectángulo por zonas transparentes, y
+                # no deben colarse en el recorte.
+                alpha &= dilate(lr, GROW)
+                # Texels opacos rodeados de opacos (fuera de la pieza cuenta como opaco: allí sigue
+                # la vecina) son opacos sí o sí; la IA solo decide la forma junto a la silueta de
+                # verdad. Así no quedan franjas transparentes en las uniones entre piezas.
+                op = t['pal'][t['px']] != 0
+                pad = np.pad(op, 1, constant_values=True)
+                solid = op & pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:]
+                alpha |= solid.repeat(SCALE, 0).repeat(SCALE, 1)
                 write(pack, t, snap(col, alpha, t))
                 done.append(t['hash'])
         return done
+
+
+def dilate(m, r):
+    """Máscara agrandada r píxeles (cuadrado)."""
+    out = m.copy()
+    h, w = m.shape
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            ys, yd = (slice(dy, h), slice(0, h - dy)) if dy >= 0 else (slice(0, h + dy), slice(-dy, h))
+            xs, xd = (slice(dx, w), slice(0, w - dx)) if dx >= 0 else (slice(0, w + dx), slice(-dx, w))
+            out[yd, xd] |= m[ys, xs]
+    return out
 
 
 def snap(col, alpha, t):
@@ -188,8 +206,11 @@ def main():
             for sc in pending(pack, files):
                 for h in up.process([sc], pack):
                     print('HD %016x' % h, flush=True)
+            # Se guardan (no se borran) para poder rehacer el paquete si cambia el método.
+            done_dir = os.path.join(queue, 'hechas')
+            os.makedirs(done_dir, exist_ok=True)
             for f in files:
-                os.remove(f)
+                os.replace(f, os.path.join(done_dir, os.path.basename(f)))
     pack, files = sys.argv[1], sys.argv[2:]
     os.makedirs(pack, exist_ok=True)
     scenes = pending(pack, files)

@@ -165,6 +165,17 @@ extern int memcard_dirty;  // la plataforma la guarda y lo pone a 0
 void memcard_new(void);    // tarjeta vacía ya formateada
 extern int card_test_save; // atajo de prueba del menú de guardar
 int card_hook_menu(CPU *c, uint32_t addr);
+
+// Modo Completo (cheats.c): todo recogido desde el principio.
+extern int full_mode;
+int cheat_hook_select(CPU *c, uint32_t addr);
+int cheat_hook_player(CPU *c, uint32_t addr);
+int cheat_state(void);
+int cheat_full_toggle(void);
+uint32_t cheat_weapons(uint32_t defeated);
+
+// Voces (voice.c): huella de la caja de diálogo en pantalla (0 = ninguna).
+uint32_t voice_frame(void);
 uint32_t card_open_event(uint32_t id, uint32_t cls, uint32_t spec);
 int card_test_event(uint32_t id);
 uint32_t card_open(uint32_t path, uint32_t mode);

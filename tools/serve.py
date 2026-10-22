@@ -2,7 +2,7 @@
 revalide cada archivo (Cache-Control: no-cache). Así, tras recompilar, nunca se queda con un
 x4.wasm o worker.js viejos mezclados con la página nueva.
 
-También sirve el paquete HD (carpeta hd_pack/, ver web/hd.js) y recibe las capturas de piezas
+También sirve las voces en español (voice_pack/, en /voice/) y el paquete HD (carpeta hd_pack/, ver web/hd.js) y recibe las capturas de piezas
 nuevas que manda el juego mientras se juega (hd_queue/); si existe el entorno de la IA
 (~/tools/hd-ai/venv), arranca tools/hd/upscale.py para convertirlas a HD sobre la marcha.
 Todo es local: el paquete sale del disco del usuario y no se distribuye.
@@ -12,6 +12,7 @@ Uso: python3 tools/serve.py [puerto]   (sirve la carpeta web/)
 import functools
 import http.server
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -21,6 +22,7 @@ import zlib
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 PACK = os.path.join(ROOT, 'hd_pack')
+VOICE = os.path.join(ROOT, 'voice_pack')  # voces en español (tools/voice/make_voices.py)
 QUEUE = os.path.join(ROOT, 'hd_queue')
 AI_PY = os.path.expanduser('~/tools/hd-ai/venv/bin/python')
 
@@ -90,6 +92,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 part = hd_list[since:]
                 total = len(hd_list)
             return self.reply(('%d\n' % total + '\n'.join(part)).encode(), 'text/plain')
+        if self.path.startswith('/voice/'):
+            name = self.path[len('/voice/'):].split('?')[0]
+            if not re.fullmatch(r'[0-9a-f]{8}\.wav|index\.json', name):
+                return self.send_error(404)
+            try:
+                with open(os.path.join(VOICE, name), 'rb') as f:
+                    body = f.read()
+            except OSError:
+                return self.send_error(404)
+            return self.reply(body, 'application/json' if name.endswith('.json') else 'audio/wav')
         super().do_GET()
 
     def do_POST(self):

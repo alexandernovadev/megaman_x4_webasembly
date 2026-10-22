@@ -9,6 +9,7 @@
 // sus vecinas en pantalla (8 píxeles alrededor) para que la IA vea el contexto y no queden
 // costuras entre piezas. La captura se manda al servidor local (web) o a una carpeta (nativo).
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 
 #include "runtime.h"
@@ -18,14 +19,17 @@
 #define MAXB 8192
 #define MAXR 4096
 #define NLISTS 4
+#define EDGE_MARGIN 16   // una pieza a menos de esto del borde de la pantalla aún no tiene todas sus vecinas
+#define EDGE_WAIT 120    // frames que se espera antes de capturarla igual (títulos, HUD: nunca se apartan del borde)
 #define MAXP 2048  // paletas distintas por frame
 
 typedef struct {
     uint64_t hash;
-    int16_t x, y;          // esquina en pantalla (relativa al búfer)
+    int16_t x, y;          // esquina, en píxeles de textura (pantalla / escala; relativa al búfer)
+    uint16_t sx, sy;       // escala de dibujo (pantalla / textura, en 1/256)
     uint8_t rw, rh;        // tamaño de la pieza en texels
-    uint8_t axis, fx, fy;  // dibujada sin escalar ni girar; volteada en x / y
-    uint8_t depth, capture;
+    uint8_t axis, fx, fy;  // dibujada sin girar (puede estar agrandada); volteada en x / y
+    uint8_t depth, capture, edge;  // edge: cerca del borde de la pantalla (le faltan vecinas)
     int order;
     uint16_t pal[256];
     uint8_t px[16 * 16];   // índices, en la orientación de la textura
@@ -226,8 +230,38 @@ static int split_large(const HdPrim *p) {
     return 1;
 }
 
-void hd_prim(const HdPrim *p) {
-    if (split_large(p)) return;
+// La PS1 lee el texel exacto del vértice de partida y avanza un texel por píxel; la GPU muestrea
+// en el centro del píxel. Sin volteo da lo mismo, pero en un sprite volteado (la u baja hacia la
+// derecha) la GPU leería un texel más a la izquierda en cada píxel. Se corrige sumando 1 a las
+// coordenadas del eje volteado: así la región de la pieza (y su huella) es la misma que sin
+// voltear y no se cuela una columna de la pieza vecina.
+static void fix_flip(HdPrim *q) {
+    if (!q->textured || q->n != 4) return;
+    int xs0 = q->x[0], xs1 = q->x[0], ys0 = q->y[0], ys1 = q->y[0];
+    for (int i = 1; i < 4; i++) {
+        if (q->x[i] < xs0) xs0 = q->x[i];
+        if (q->x[i] > xs1) xs1 = q->x[i];
+        if (q->y[i] < ys0) ys0 = q->y[i];
+        if (q->y[i] > ys1) ys1 = q->y[i];
+    }
+    int ul = -1, ur = -1, vt = -1, vb = -1;
+    for (int i = 0; i < 4; i++) {
+        if (q->x[i] != xs0 && q->x[i] != xs1) return;  // girado: se deja como está
+        if (q->y[i] != ys0 && q->y[i] != ys1) return;
+        int *pu = q->x[i] == xs0 ? &ul : &ur, *pv = q->y[i] == ys0 ? &vt : &vb;
+        if (*pu >= 0 && *pu != q->u[i]) return;
+        if (*pv >= 0 && *pv != q->v[i]) return;
+        *pu = q->u[i]; *pv = q->v[i];
+    }
+    if (xs1 > xs0 && ul > ur) for (int i = 0; i < 4; i++) q->u[i]++;
+    if (ys1 > ys0 && vt > vb) for (int i = 0; i < 4; i++) q->v[i]++;
+}
+
+void hd_prim(const HdPrim *orig) {
+    if (split_large(orig)) return;
+    HdPrim fixed = *orig;
+    fix_flip(&fixed);
+    const HdPrim *p = &fixed;
     List *l = list_at(p->da_x, p->da_y, p->da_w, p->da_h);
     int nv = p->n == 4 ? 6 : 3;
     if (l->nv + nv > MAXV) { l->overflow = 1; return; }
@@ -272,9 +306,16 @@ void hd_prim(const HdPrim *p) {
                 if (p->y[i] > ys1) ys1 = p->y[i];
             }
             r->hash = h; r->rw = (uint8_t)rw; r->rh = (uint8_t)rh; r->depth = (uint8_t)p->depth;
-            r->x = (int16_t)(xs0 - l->ox); r->y = (int16_t)(ys0 - l->oy);
+            // Piezas agrandadas (p. ej. la bola de la carga de X): su posición se pasa a píxeles
+            // de textura, así las de un mismo objeto encajan entre sí como si no lo estuvieran.
+            int sw = xs1 - xs0, sh = ys1 - ys0;
+            r->sx = (uint16_t)(sw > 0 ? sw * 256 / rw : 256); r->sy = (uint16_t)(sh > 0 ? sh * 256 / rh : 256);
+            r->x = (int16_t)floor((xs0 - l->ox) * 256.0 / r->sx + 0.5);
+            r->y = (int16_t)floor((ys0 - l->oy) * 256.0 / r->sy + 0.5);
             r->axis = 0; r->fx = r->fy = 0;
-            if (p->n == 4 && xs1 - xs0 == rw && ys1 - ys0 == rh) {
+            r->edge = xs0 - l->ox - EDGE_MARGIN < -ws_reveal || xs1 - l->ox + EDGE_MARGIN > l->w + ws_reveal ||
+                      ys0 - l->oy - EDGE_MARGIN < 0 || ys1 - l->oy + EDGE_MARGIN > l->h;
+            if (p->n == 4 && sw > 0 && sh > 0) {
                 int axis = 1, ux0 = -1, ux1 = -1, vy0 = -1, vy1 = -1;
                 for (int i = 0; i < 4; i++) {
                     if (p->x[i] != xs0 && p->x[i] != xs1) axis = 0;
@@ -406,20 +447,43 @@ static int palette_ok(const Rec *r) {
 #define COV_X 192  // las piezas de los márgenes panorámicos tienen x negativa
 static uint16_t cov[COV_H][COV_W], cov_run;
 
+// Sin marcar: devuelve si la pieza tapa a las de la tanda en más de un cuarto de sus píxeles
+// opacos (otra capa encima); los solapes pequeños son normales entre las piezas de un mismo
+// sprite (filas que se pisan uno o dos píxeles) y no deben partirlo.
 static int cov_test_mark(const Rec *r, int mark) {
+    int opaque = 0, hit = 0;
     for (int j = 0; j < r->rh; j++)
         for (int i = 0; i < r->rw; i++) {
             int x = r->x + i + COV_X, y = r->y + j;
             if (x < 0 || y < 0 || x >= COV_W || y >= COV_H) continue;
             int ti = r->fx ? r->rw - 1 - i : i, tj = r->fy ? r->rh - 1 - j : j;
             if (!r->pal[r->px[tj * r->rw + ti]]) continue;
-            if (!mark && cov[y][x] == cov_run) return 1;
+            opaque++;
+            if (!mark && cov[y][x] == cov_run) hit++;
             if (mark) cov[y][x] = cov_run;
         }
-    return 0;
+    return !mark && hit * 4 > opaque;
 }
 
-static int is_new(const Rec *r) { return r->capture && !set_has(known, r->hash) && palette_ok(r); }
+// Piezas que entran por el borde de la pantalla (el fondo al desplazarse): se espera a que
+// estén más adentro, con sus vecinas alrededor; si no, la IA les dibuja un borde que luego se
+// ve como una línea en medio de la pantalla. Lo que nunca se aparta del borde se captura igual
+// pasados EDGE_WAIT frames.
+#define EW_SLOTS (1u << 16)
+static uint64_t ew_key[EW_SLOTS];
+static uint16_t ew_count[EW_SLOTS];
+static int edge_ready(uint64_t h) {
+    for (uint32_t i = slot_of(h) & (EW_SLOTS - 1), n = 0; n < EW_SLOTS; i = (i + 1) & (EW_SLOTS - 1), n++) {
+        if (ew_key[i] == h) return ++ew_count[i] >= EDGE_WAIT;
+        if (!ew_key[i]) { ew_key[i] = h; ew_count[i] = 1; return 0; }
+    }
+    return 1;  // tabla llena
+}
+
+static int is_new(const Rec *r) {
+    if (!r->capture || set_has(known, r->hash) || !palette_ok(r)) return 0;
+    return !r->edge || edge_ready(r->hash);
+}
 
 static void emit_scene(int cx0, int cy0, int cw, int ch, Rec *const *paintv, int np, Rec *const *tiles, int nt, int solo) {
     int need = 16 + cw * ch * 4;
@@ -482,7 +546,7 @@ static void capture_frame(List *l) {
     for (int k = 0; k < l->nr; k++) {
         Rec *r = &l->r[k];
         if (!r->axis) {
-            // Pieza girada o escalada: sola, en su orientación, y corta la capa.
+            // Pieza girada: sola, en su orientación, y corta la capa.
             capture_run(l, start, k);
             start = k + 1;
             if (++cov_run == 0) { memset(cov, 0, sizeof cov); cov_run = 1; }
@@ -492,7 +556,9 @@ static void capture_frame(List *l) {
             }
             continue;
         }
-        if (cov_test_mark(r, 0)) {  // tapa a otra de la tanda: empieza una capa nueva
+        const Rec *first = &l->r[start];
+        if ((k > start && (first->sx != r->sx || first->sy != r->sy)) || cov_test_mark(r, 0)) {
+            // Tapa a otra de la tanda, o va a otra escala: empieza una capa nueva.
             capture_run(l, start, k);
             start = k;
             if (++cov_run == 0) { memset(cov, 0, sizeof cov); cov_run = 1; }
