@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mega Man X4 · WebAssembly</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #151924; --line: #262c3b; --text: #e6e9f0; --muted: #8a93a8;
+    --accent: #3fa7ff; --accent2: #ff4d5e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 14px; }
+  #screen { position: relative; width: min(100%, calc((100vh - 138px) * 4 / 3));
+    aspect-ratio: 4 / 3; background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  canvas { width: 100%; height: 100%; display: block; }
+  select { font: inherit; color: var(--text); background: #1f2533; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  #drop { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 12px; text-align: center; padding: 24px; background: var(--panel); }
+  #drop.over { outline: 2px dashed var(--accent); outline-offset: -12px; }
+  #drop p { margin: 0; color: var(--muted); max-width: 46ch; }
+  button, label.btn { font: inherit; color: var(--text); background: #1f2533; border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+  button.btn, label.btn { background: var(--accent); color: #04121f; border: 0; font-weight: 600; padding: 10px 18px; }
+  #resume:not([hidden]) + label.btn { background: #1f2533; color: var(--text); border: 1px solid var(--line); font-weight: 400; padding: 6px 14px; }
+  #bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+    color: var(--muted); font-size: 13px; width: min(100%, 960px); }
+  #status { flex: 1; min-width: 200px; }
+  #keys { color: var(--muted); font-size: 13px; text-align: center; }
+  kbd { background: #1f2533; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 5px; font: 12px ui-monospace, monospace; color: var(--text); }
+  #screen:fullscreen { width: 100vw !important; height: 100vh !important; aspect-ratio: auto !important; border: 0; border-radius: 0; }
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <canvas id="c" width="320" height="240"></canvas>
+  <div id="drop">
+    <button id="resume" class="btn" hidden></button>
+    <label class="btn" id="pick">Elegir tu Mega Man X4 (USA).bin
+      <input id="file" type="file" accept=".bin,.img,.iso" hidden>
+    </label>
+    <p>O arrástralo aquí. Necesitas tu propia copia del disco en formato <code>.bin</code> (2352 bytes por sector).
+      Se lee desde tu equipo, en tu navegador: no se sube a ningún sitio.</p>
+  </div>
+</div>
+
+<div id="bar">
+  <span id="status">Cargando el motor…</span>
+  <span id="fps"></span>
+  <button id="pause" disabled>Pausa (P)</button>
+  <button id="full">Pantalla completa (F)</button>
+</div>
+
+<div id="keys">
+  <kbd>↑↓←→</kbd> mover · <kbd>Z</kbd> dash (◯) · <kbd>X</kbd> saltar (✕) · <kbd>C</kbd> disparo/espada (▢) · <kbd>V</kbd> △ ·
+  <kbd>A</kbd>/<kbd>D</kbd> L1/R1 · <kbd>Q</kbd>/<kbd>E</kbd> L2/R2 · <kbd>Enter</kbd> Start ·
+  <kbd>Shift</kbd> Select · o un mando
+</div>
+
+<script src="anime4k.js"></script>
+<script src="scalefx.js"></script>
+<script src="hd.js"></script>
+<script src="render.js"></script>
+<script>
+const PAD = { select: 1, start: 8, up: 16, right: 32, down: 64, left: 128, l2: 256, r2: 512,
+  l1: 1024, r1: 2048, triangle: 4096, circle: 8192, cross: 16384, square: 32768 };
+const KEYS = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  // Como en la versión de PC: Z dash, X salto, C disparo/espada (controles por defecto de PS1).
+  KeyZ: 'circle', KeyX: 'cross', KeyC: 'square', KeyV: 'triangle',
+  KeyA: 'l1', KeyD: 'r1', KeyQ: 'l2', KeyE: 'r2',
+  Enter: 'start', ShiftLeft: 'select', ShiftRight: 'select',
+};
+// Mapeo "standard" de la Gamepad API.
+const GAMEPAD = ['cross', 'circle', 'square', 'triangle', 'l1', 'r1', 'l2', 'r2', 'select', 'start',
+  null, null, 'up', 'down', 'left', 'right'];
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('c');
+const renderer = X4Render.createRenderer(canvas);
+// Calidad fija, sin opciones: filtro nítido, vídeos mejorados, panorámica 16:9 y antialiasing.
+renderer.setFilter('nitido');
+renderer.setEnhanceVideo(true);
+// Borra las preferencias que guardaban versiones anteriores de la página.
+try { for (const k of ['x4-filter', 'x4-vidfx', 'x4-wide', 'x4-aa']) localStorage.removeItem(k); } catch {}
+function applyWide() {
+  $('screen').style.aspectRatio = '16 / 9';
+  $('screen').style.width = 'min(100%, calc((100vh - 138px) * 16 / 9))';
+  if (typeof worker !== 'undefined') worker.postMessage({ type: 'wide', on: true });
+}
+function applyAA() { if (typeof worker !== 'undefined') worker.postMessage({ type: 'aa', on: true }); }
+new ResizeObserver(() => renderer.redraw()).observe(canvas);
+const status = (t) => { $('status').textContent = t; };
+
+// Audio: el worker manda bloques PCM de 16 bits estéreo a 44,1 kHz; un AudioWorklet los
+// encola. Se mantiene poca latencia descartando lo más viejo si la cola crece demasiado.
+const WORKLET = `
+class XA extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.q = new Float32Array(44100 * 2); this.r = 0; this.w = 0; this.started = false; this.under = 0; this.trims = 0; this.n = 0;
+    this.port.onmessage = (e) => {
+      const s = new Int16Array(e.data), cap = this.q.length;
+      for (let i = 0; i < s.length; i++) { this.q[this.w % cap] = s[i] / 32768; this.w++; }
+      if (this.w - this.r > 44100 * 2 * 0.3) { this.r = this.w - 44100 * 2 * 0.1; this.trims++; }  // >300 ms: recorta
+    };
+  }
+  process(_, outputs) {
+    const [L, R] = outputs[0], cap = this.q.length, avail = (this.w - this.r) >> 1;
+    if (!this.started && avail < 4410) return true;  // espera 100 ms de colchón
+    this.started = avail > 0;
+    // Deriva entre el reloj del worker y el de la tarjeta de sonido: si la cola se aleja del
+    // objetivo, cada 128 muestras se repite o se salta una (inaudible).
+    const drift = avail > 6000 ? 1 : avail < 2000 ? -1 : 0;
+    for (let i = 0; i < L.length; i++) {
+      if (drift < 0 && i === 64) { L[i] = L[i - 1]; R[i] = R[i - 1]; continue; }
+      if (drift > 0 && i === 64) this.r += 2;
+      if (this.w - this.r >= 2) { L[i] = this.q[this.r % cap]; R[i] = this.q[(this.r + 1) % cap]; this.r += 2; }
+      else { L[i] = R[i] = 0; if (this.started) this.under++; }
+    }
+    if (++this.n % 172 === 0) this.port.postMessage({ under: this.under, trims: this.trims, buf: (this.w - this.r) >> 1, recv: this.w >> 1, t: Math.round(currentTime * 44100) });
+    return true;
+  }
+}
+registerProcessor('xa', XA);`;
+let audioCtx = null, audioNode = null;
+async function startAudio() {
+  if (audioCtx) { if (!paused) audioCtx.resume(); return; }
+  audioCtx = new AudioContext({ sampleRate: 44100 });
+  const url = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
+  await audioCtx.audioWorklet.addModule(url);
+  audioNode = new AudioWorkletNode(audioCtx, 'xa', { outputChannelCount: [2] });
+  audioNode.connect(audioCtx.destination);
+  audioNode.port.onmessage = (e) => { window.audioStats = e.data; };
+}
+// Los navegadores solo dejan sonar audio tras un gesto del usuario.
+addEventListener('pointerdown', () => started && startAudio());
+addEventListener('keydown', () => started && startAudio());
+
+const worker = new Worker('worker.js');
+// Medidas de fluidez (para pruebas): tiempo de dibujo por frame y saltos entre frames.
+window.x4perf = { frames: 0, drawMax: 0, drawSum: 0, gaps33: 0, gapMax: 0 };
+let perfLast = 0;
+function perfNote(t, ms) {
+  const p = window.x4perf;
+  p.frames++; p.drawSum += ms; p.drawMax = Math.max(p.drawMax, ms);
+  if (perfLast) { const gap = t - perfLast; if (gap > 33) p.gaps33++; p.gapMax = Math.max(p.gapMax, gap); }
+  perfLast = t;
+}
+applyWide();
+let started = false, paused = false, keyBits = 0, sentBits = -1, frames = 0, lastFrame = 0;
+
+// Lo que se recuerda en este navegador (IndexedDB): la tarjeta de memoria y el disco elegido.
+// El disco se guarda como permiso de acceso al archivo (Chrome/Edge) o, si el navegador no
+// lo permite, como copia local; nunca sale del equipo.
+const db = new Promise((ok, fail) => {
+  const r = indexedDB.open('megaman-x4', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('kv');
+  r.onsuccess = () => ok(r.result);
+  r.onerror = () => fail(r.error);
+});
+async function dbGet(k) {
+  try { const d = await db; return await new Promise((ok, fail) => {
+    const r = d.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => ok(r.result); r.onerror = () => fail(r.error); });
+  } catch { return undefined; }
+}
+async function dbPut(k, v) {
+  try { const d = await db; await new Promise((ok, fail) => {
+    const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = ok; t.onerror = () => fail(t.error); });
+    return true;
+  } catch { return false; }
+}
+
+worker.onmessage = (e) => {
+  const m = e.data;
+  if (m.type === 'card') {
+    dbPut('card0', m.buf);
+  } else if (m.type === 'audio') {
+    if (audioNode) audioNode.port.postMessage(m.buf, [m.buf]);
+  } else if (m.type === 'hd') {
+    const t = performance.now();
+    renderer.hdFrame(m);
+    perfNote(t, performance.now() - t);
+    frames++; lastFrame = m.frame;
+  } else if (m.type === 'frame') {
+    const t = performance.now();
+    renderer.frame(m.buf, m.w, m.h, m.video, m.wide);
+    perfNote(t, performance.now() - t);
+    frames++; lastFrame = m.frame;
+  } else if (m.type === 'ready') {
+    engineReady = true;
+    if (pendingFile) launch(pendingFile);
+    else status('Listo. Elige tu disco para empezar.');
+  } else if (m.type === 'log') {
+    console.log(m.text);
+    if (/^(No se|EXE|FATAL)/.test(m.text)) status(m.text);
+  } else if (m.type === 'error' || m.type === 'exit') {
+    status(m.type === 'exit' ? `El juego terminó (código ${m.code}).` : 'Error: ' + m.text);
+  }
+};
+worker.onerror = (e) => status('Error en el worker: ' + e.message);
+
+let engineReady = false, pendingFile = null;
+async function launch(file) {
+  status(`Jugando desde ${file.name}`);
+  applyWide();
+  applyAA();
+  // ?probar-guardado: CONTINUE -> tarjeta abre el menú de guardar (para probar sin jugar).
+  const testSave = new URLSearchParams(location.search).has('probar-guardado');
+  // HD: si la GPU puede y el servidor local tiene el paquete HD (tools/serve.py). ?sin-hd lo apaga (pruebas).
+  const hd = renderer.hd && !new URLSearchParams(location.search).has('sin-hd') ? await renderer.hd.config() : { on: false, capture: false, known: new Uint32Array(0) };
+  worker.postMessage({ type: 'start', file, card: await dbGet('card0'), testSave, hd });
+}
+// `remember`: el handle del archivo (Chrome/Edge) o el propio File para la próxima visita.
+function start(file, remember) {
+  if (started || !file) return;
+  started = true;
+  $('drop').remove();
+  $('pause').disabled = false;
+  startAudio();
+  if (remember) dbPut('disc', remember);
+  if (engineReady) launch(file);
+  else { pendingFile = file; status('Preparando el motor…'); }
+}
+
+// Elegir disco: con el selector de archivos del sistema cuando existe, para poder recordar
+// el permiso; si no, con el <input> de siempre.
+$('pick').onclick = async (e) => {
+  if (!window.showOpenFilePicker) return;
+  e.preventDefault();
+  try {
+    const [h] = await showOpenFilePicker({ types: [{ description: 'Disco de PlayStation', accept: { 'application/octet-stream': ['.bin', '.img', '.iso'] } }] });
+    start(await h.getFile(), h);
+  } catch {}
+};
+$('file').onchange = (e) => { const f = e.target.files[0]; start(f, f); };
+const drop = $('drop');
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = async (e) => {
+  e.preventDefault();
+  const item = e.dataTransfer.items[0];
+  const f = e.dataTransfer.files[0];
+  let h = null;
+  try { h = item && item.getAsFileSystemHandle ? await item.getAsFileSystemHandle() : null; } catch {}
+  start(f, h && h.kind === 'file' ? h : f);
+};
+
+// Disco de la visita anterior: un clic para seguir jugando (el clic también hace falta para
+// el audio y, en Chrome, para renovar el permiso de lectura).
+dbGet('disc').then((saved) => {
+  if (!saved || started) return;
+  const btn = $('resume');
+  btn.textContent = `Jugar con ${saved.name}`;
+  btn.hidden = false;
+  btn.onclick = async () => {
+    try {
+      if (saved.getFile) {
+        if ((await saved.queryPermission({ mode: 'read' })) !== 'granted' &&
+            (await saved.requestPermission({ mode: 'read' })) !== 'granted') return;
+        start(await saved.getFile());
+      } else start(saved);
+    } catch {
+      btn.hidden = true;
+      status('No se encontró el disco de la última vez. Elígelo de nuevo.');
+    }
+  };
+});
+
+function togglePause() {
+  if (!started) return;
+  paused = !paused;
+  worker.postMessage({ type: 'pause', paused });
+  if (audioCtx) paused ? audioCtx.suspend() : audioCtx.resume();
+  $('pause').textContent = paused ? 'Seguir (P)' : 'Pausa (P)';
+}
+$('pause').onclick = togglePause;
+const fullscreen = () => document.fullscreenElement ? document.exitFullscreen() : $('screen').requestFullscreen();
+$('full').onclick = fullscreen;
+
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyP' || e.code === 'Escape' && !document.fullscreenElement) { togglePause(); return; }
+  if (e.code === 'KeyF') { fullscreen(); return; }
+  const b = KEYS[e.code];
+  if (b) { keyBits |= PAD[b]; e.preventDefault(); }
+});
+addEventListener('keyup', (e) => { const b = KEYS[e.code]; if (b) keyBits &= ~PAD[b]; });
+addEventListener('blur', () => { keyBits = 0; });
+
+// El juego avanza al ritmo de la pantalla: con un refresco de ~60 Hz, un frame del juego por
+// refresco exacto (sin tirones); con otras frecuencias, los que tocan por tiempo (60 por segundo).
+let lastT = 0, avgDt = 16.7, acc = 0;
+function pace(t) {
+  if (!started || paused) { lastT = t; return; }
+  const dt = lastT ? Math.min(t - lastT, 100) : 16.7;
+  lastT = t;
+  avgDt += (dt - avgDt) * 0.05;
+  let n;
+  if (Math.abs(avgDt - 1000 / 60) < 0.8) n = 1;
+  else { acc += dt * 60 / 1000; n = Math.floor(acc); acc -= n; }
+  if (n > 0) worker.postMessage({ type: 'credits', n });
+}
+
+// Cada frame del navegador: junta teclado y mandos y avisa al worker si algo cambió.
+function poll(t) {
+  pace(t);
+  let bits = keyBits;
+  for (const gp of navigator.getGamepads ? navigator.getGamepads() : []) {
+    if (!gp) continue;
+    gp.buttons.forEach((btn, i) => { if (btn.pressed && GAMEPAD[i]) bits |= PAD[GAMEPAD[i]]; });
+    const [x, y] = gp.axes;
+    if (x < -0.5) bits |= PAD.left; if (x > 0.5) bits |= PAD.right;
+    if (y < -0.5) bits |= PAD.up; if (y > 0.5) bits |= PAD.down;
+  }
+  if (bits !== sentBits) { worker.postMessage({ type: 'pad', buttons: bits }); sentBits = bits; }
+  requestAnimationFrame(poll);
+}
+requestAnimationFrame(poll);
+
+setInterval(() => {
+  if (started) $('fps').textContent = paused ? 'en pausa' : `${frames} fps · frame ${lastFrame}`;
+  frames = 0;
+}, 1000);
+</script>
+</body>
+</html>

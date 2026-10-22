@@ -1,0 +1,28 @@
+# Todo lo que sale del disco del usuario se queda en su equipo: no se sube ni se distribuye.
+
+# Archivos del juego (extraídos del disco) e imágenes de disco
+extracted/
+*.bin
+*.cue
+*.iso
+*.img
+
+# Compilación: el C recompilado (build/gen) y los binarios son traducción del ejecutable del juego
+build/
+web/x4.js
+web/x4.wasm
+
+# HD con IA: piezas generadas a partir de los gráficos del juego
+hd_pack/
+hd_queue/
+hd_preview/
+
+# Partidas guardadas (tarjeta de memoria)
+*.mcr
+
+# Python, macOS, editores
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.idea/
