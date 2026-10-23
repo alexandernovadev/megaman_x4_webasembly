@@ -4,13 +4,22 @@
 el navegador desde tu propio disco. Incluye HD con IA a 8x, panorámica 16:9, trucos con un modo
 "Completo" y una prueba de voces en español.
 
+## Jugar en un comando
+
 ```bash
-make web
-python3 tools/serve.py 8765   # y abre http://localhost:8765
+./jugar.sh "ruta/a/Mega Man X4 (USA).bin"   # la primera vez
+./jugar.sh                                  # las siguientes
 ```
 
-Necesitas tu copia de `Mega Man X4 (USA).bin`. Se lee en tu navegador y no se sube a ningún sitio.
-Este repositorio no contiene nada del juego.
+Pone tu disco en `disco/`, lo extrae, compila la versión web (la primera vez tarda unos minutos),
+arranca el servidor y abre el navegador: pulsa **Iniciar juego** y listo.
+
+Necesitas tu propia copia de `Mega Man X4 (USA).bin`, `python3`, un compilador de C (en macOS,
+`xcode-select --install`) y [Emscripten](https://emscripten.org/docs/getting_started/downloads.html)
+(el script te dice cómo instalarlo si falta). Este repositorio no contiene nada del juego, y tu
+disco no sale de tu equipo.
+
+A mano: `make web` y `python3 tools/serve.py 8765`, y en http://localhost:8765 eliges el disco.
 
 ## Documentación
 

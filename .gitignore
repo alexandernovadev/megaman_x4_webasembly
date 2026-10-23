@@ -2,6 +2,7 @@
 
 # Archivos del juego (extraídos del disco) e imágenes de disco
 extracted/
+disco/
 *.bin
 *.cue
 *.iso

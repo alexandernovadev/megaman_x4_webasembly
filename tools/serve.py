@@ -6,7 +6,8 @@ También sirve las voces en español (voice_pack/, en /voice/), la página /grab
 grabaciones de referencia para las voces en voice_refs/, y el paquete HD (carpeta hd_pack/, ver web/hd.js) y recibe las capturas de piezas
 nuevas que manda el juego mientras se juega (hd_queue/); si existe el entorno de la IA
 (~/tools/hd-ai/venv), arranca tools/hd/upscale.py para convertirlas a HD sobre la marcha.
-Todo es local: el paquete sale del disco del usuario y no se distribuye.
+Si hay un disco en la carpeta disco/ (lo pone jugar.sh), la página lo ofrece en /disco/ para
+empezar con un clic. Todo es local: el disco y el paquete son del usuario y no se distribuyen.
 
 Uso: python3 tools/serve.py [puerto]   (sirve la carpeta web/)
 """
@@ -15,6 +16,7 @@ import http.server
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -25,6 +27,7 @@ import zlib
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 PACK = os.path.join(ROOT, 'hd_pack')
 VOICE = os.path.join(ROOT, 'voice_pack')  # voces en español (tools/voice/make_voices.py)
+DISC_DIR = os.path.join(ROOT, 'disco')   # el disco del usuario (jugar.sh)
 REFS = os.path.join(ROOT, 'voice_refs')   # grabaciones de referencia (web/grabar.html)
 REF_NAME = r'[a-z]+_[0-9]{1,2}\.wav'
 QUEUE = os.path.join(ROOT, 'hd_queue')
@@ -32,6 +35,15 @@ AI_PY = os.path.expanduser('~/tools/hd-ai/venv/bin/python')
 
 hd_list = []          # huellas en el orden en que estuvieron listas
 hd_lock = threading.Lock()
+
+
+def local_disc():
+    """Primer disco de disco/ (.bin, .img o .iso), o None."""
+    try:
+        names = sorted(f for f in os.listdir(DISC_DIR) if f.lower().endswith(('.bin', '.img', '.iso')))
+    except OSError:
+        return None
+    return os.path.join(DISC_DIR, names[0]) if names else None
 
 
 def scan_pack():
@@ -85,6 +97,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path.startswith('/disco/'):
+            disc = local_disc()
+            if not disc:
+                return self.send_error(404)
+            if self.path.split('?')[0] == '/disco/info':
+                info = {'name': os.path.basename(disc), 'size': os.path.getsize(disc)}
+                return self.reply(json.dumps(info).encode(), 'application/json')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Length', str(os.path.getsize(disc)))
+            self.end_headers()
+            with open(disc, 'rb') as f:
+                try:
+                    shutil.copyfileobj(f, self.wfile, 1 << 20)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+            return
         if self.path.split('?')[0] in ('/grabar', '/grabar/'):
             self.path = '/grabar.html'
         if self.path.startswith('/refs/'):

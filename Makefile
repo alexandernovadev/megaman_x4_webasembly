@@ -1,7 +1,7 @@
 EXE     := extracted/SLUS_005.61
 GEN     := build/gen
 CFLAGS  := -O1 -std=c11 -Iruntime -I$(GEN) -Wno-unused-label -Wno-unused-variable -Wno-parentheses-equality -Wno-tautological-compare
-EMSDK   := $(HOME)/tools/emsdk
+EMSDK   ?= $(HOME)/tools/emsdk
 
 GEN_SRC := $(wildcard $(GEN)/gen_*.c) $(GEN)/table.c
 CORE_SRC := runtime/runtime.c runtime/cdrom.c runtime/threads.c runtime/gpu.c runtime/mdec.c runtime/audio.c runtime/spu.c runtime/widescreen.c runtime/memcard.c runtime/texdump.c runtime/hd.c runtime/cheats.c runtime/voice.c
@@ -33,7 +33,8 @@ build/native:
 
 # WebAssembly (Emscripten). `wasm` es la versión de línea de comandos para Node (pruebas);
 # `web` es la del navegador, que corre en un Web Worker y lee el disco con WORKERFS.
-EMCC := source $(EMSDK)/emsdk_env.sh >/dev/null 2>&1 && emcc
+# Con el emsdk en $(EMSDK) (por defecto ~/tools/emsdk) o con emcc ya en el PATH.
+EMCC := $(if $(wildcard $(EMSDK)/emsdk_env.sh),source $(EMSDK)/emsdk_env.sh >/dev/null 2>&1 &&) emcc
 WASM_FLAGS := -O2 -sINITIAL_MEMORY=256MB -sSTACK_SIZE=8MB -sFORCE_FILESYSTEM=1 -sASYNCIFY -sASYNCIFY_STACK_SIZE=1048576
 WASM_CORE := $(patsubst %.c,build/wasm/%.o,$(notdir $(GEN_SRC) $(CORE_SRC)))
 wasm: gen

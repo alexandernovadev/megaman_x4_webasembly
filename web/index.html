@@ -20,12 +20,15 @@
   select { font: inherit; color: var(--text); background: #1f2533; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
   #drop { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 12px; text-align: center; padding: 24px; background: var(--panel); }
+  #drop { overflow-y: auto; justify-content: safe center; }
+  @media (max-width: 700px) { #screen:has(#drop) { aspect-ratio: auto !important; min-height: 60vh; } }
   #drop.over { outline: 2px dashed var(--accent); outline-offset: -12px; }
   #drop p { margin: 0; color: var(--muted); max-width: 46ch; }
   button, label.btn { font: inherit; color: var(--text); background: #1f2533; border: 1px solid var(--line);
     border-radius: 6px; padding: 6px 14px; cursor: pointer; }
   button.btn, label.btn { background: var(--accent); color: #04121f; border: 0; font-weight: 600; padding: 10px 18px; }
-  #resume:not([hidden]) + label.btn { background: #1f2533; color: var(--text); border: 1px solid var(--line); font-weight: 400; padding: 6px 14px; }
+  button.btn.big { font-size: 18px; padding: 14px 34px; border-radius: 10px; box-shadow: 0 8px 26px rgba(63, 167, 255, .35); }
+  #play:not([hidden]) ~ label.btn, #resume:not([hidden]) + label.btn { background: #1f2533; color: var(--text); border: 1px solid var(--line); font-weight: 400; padding: 6px 14px; }
   #status { color: var(--muted); font-size: 13px; min-height: 1.5em; }
   kbd { background: #1f2533; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
     padding: 0 5px; font: 12px ui-monospace, monospace; color: var(--text); }
@@ -142,6 +145,7 @@
 <div id="screen">
   <canvas id="c" width="320" height="240"></canvas>
   <div id="drop">
+    <button id="play" class="btn big" hidden>▶ Iniciar juego</button>
     <button id="resume" class="btn" hidden></button>
     <label class="btn" id="pick">Elegir tu Mega Man X4 (USA).bin
       <input id="file" type="file" accept=".bin,.img,.iso" hidden>
@@ -297,7 +301,7 @@ function toast(t) {
 }
 const status = (t) => {
   $('status').textContent = t;
-  $('dropstatus').textContent = t;
+  if ($('dropstatus')) $('dropstatus').textContent = t;  // desaparece al empezar
   if (started && /^(Error|No se|EXE|FATAL|El juego terminó)/.test(t)) toast(t);
 };
 
@@ -461,10 +465,39 @@ drop.ondrop = async (e) => {
   start(f, h && h.kind === 'file' ? h : f);
 };
 
+// Disco en la carpeta disco/ del proyecto (lo pone jugar.sh): un clic y empieza. Se baja del
+// servidor local entero a memoria; el clic también hace falta para el audio.
+fetch('disco/info').then((r) => r.ok ? r.json() : null).then((info) => {
+  if (!info || started) return;
+  const btn = $('play');
+  btn.hidden = false;
+  $('resume').hidden = true;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      const res = await fetch('disco/file');
+      const reader = res.body.getReader(), parts = [];
+      let got = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value);
+        got += value.length;
+        btn.textContent = `Cargando el disco… ${Math.round(got * 100 / info.size)}%`;
+      }
+      start(new File(parts, info.name));
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '▶ Iniciar juego';
+      status('No se pudo cargar el disco de la carpeta disco/: ' + e.message);
+    }
+  };
+}).catch(() => {});
+
 // Disco de la visita anterior: un clic para seguir jugando (el clic también hace falta para
 // el audio y, en Chrome, para renovar el permiso de lectura).
 dbGet('disc').then((saved) => {
-  if (!saved || started) return;
+  if (!saved || started || !$('play').hidden) return;
   const btn = $('resume');
   btn.textContent = `Jugar con ${saved.name}`;
   btn.hidden = false;
