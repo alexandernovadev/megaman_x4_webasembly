@@ -24,6 +24,7 @@ onmessage = (e) => {
     if (m.card && m.card.byteLength === 131072) Module.HEAPU8.set(new Uint8Array(m.card), Module._x4_card());
     else Module._x4_card_new();
     Module._x4_test_save(m.testSave ? 1 : 0);
+    for (const k of m.dub || []) Module._x4_voice_dub(parseInt(k, 16));
     // HD: piezas que ya existen (pares de 32 bits), por tandas en el búfer del juego.
     if (m.hd) {
       const buf = Module._x4_hd_buf() >> 2, heap = new Uint32Array(Module.HEAPU8.buffer);
@@ -43,6 +44,8 @@ onmessage = (e) => {
     Module._x4_set_aa(m.on ? 1 : 0);
   } else if (m.type === 'wide') {
     Module._x4_set_widescreen(m.on ? 1 : 0);
+  } else if (m.type === 'dub') {
+    for (const k of m.keys) Module._x4_voice_dub(parseInt(k, 16));
   } else if (m.type === 'full') {
     Module._x4_full_toggle();
   } else if (m.type === 'pause') {

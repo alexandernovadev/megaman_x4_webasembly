@@ -21,6 +21,8 @@ hd_preview/
 # Voces en español: guion traducido del texto del juego y audios generados a partir de él
 voice_lines/
 voice_pack/
+# Grabaciones de referencia (voz del usuario, página /grabar)
+voice_refs/
 
 # Partidas guardadas (tarjeta de memoria)
 *.mcr

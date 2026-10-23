@@ -121,18 +121,26 @@ void frame_hook(long frame) {
     // X4_POKE="2000:801721f7=1,..." escribe ese byte en ese frame (pruebas).
     const char *poke = getenv("X4_POKE");
     if (poke) {
-        char buf[512];
+        char buf[8192];
         snprintf(buf, sizeof buf, "%s", poke);
         for (char *t = strtok(buf, ","); t; t = strtok(NULL, ",")) {
             uint32_t a; unsigned v; long f;
             if (sscanf(t, "%ld:%x=%x", &f, &a, &v) == 3 && f == frame) WR8(a, v);
         }
     }
+    // X4_DUB="79deef5f,..." : cajas con voz (sin pitido de letras), como las dice la web.
+    static int dub_loaded;
+    if (!dub_loaded && getenv("X4_DUB")) {
+        char buf[8192];
+        snprintf(buf, sizeof buf, "%s", getenv("X4_DUB"));
+        for (char *t = strtok(buf, ","); t; t = strtok(NULL, ",")) voice_dub((uint32_t)strtoul(t, NULL, 16));
+    }
+    dub_loaded = 1;
     // X4_VOICELOG: muestra la huella de cada caja de diálogo nueva (ver voice.c).
     if (getenv("X4_VOICELOG")) {
         static uint32_t last_voice;
         uint32_t k = voice_frame();
-        if (k != last_voice) { fprintf(stderr, "[voz] %ld %08x\n", frame, k); last_voice = k; }
+        if (k != last_voice) { fprintf(stderr, "[voz] %ld %08x%s\n", frame, k, voice_bottom() ? " abajo" : ""); last_voice = k; }
     }
     // X4_RAMDUMP="frame:archivo": guarda los 2 MB de RAM en ese frame (pruebas).
     const char *rd = getenv("X4_RAMDUMP");

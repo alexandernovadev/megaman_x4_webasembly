@@ -176,6 +176,9 @@ uint32_t cheat_weapons(uint32_t defeated);
 
 // Voces (voice.c): huella de la caja de diálogo en pantalla (0 = ninguna).
 uint32_t voice_frame(void);
+int voice_bottom(void);
+void voice_dub(uint32_t key);
+int voice_hook_sound(CPU *c, uint32_t addr);
 uint32_t card_open_event(uint32_t id, uint32_t cls, uint32_t spec);
 int card_test_event(uint32_t id);
 uint32_t card_open(uint32_t path, uint32_t mode);

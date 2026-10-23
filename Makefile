@@ -44,7 +44,7 @@ web: gen
 	$(MAKE) web/x4.js
 web/x4.js: $(WASM_CORE) build/wasm/web.o
 	$(EMCC) -o $@ $^ $(WASM_FLAGS) -sENVIRONMENT=worker -lworkerfs.js -sINVOKE_RUN=0 \
-		-sEXPORTED_RUNTIME_METHODS=callMain,FS,WORKERFS,HEAPU8 -sEXPORTED_FUNCTIONS=_main,_x4_set_pad,_x4_set_paused,_x4_set_widescreen,_x4_set_aa,_x4_add_credits,_x4_card,_x4_card_new,_x4_test_save,_x4_hd_enable,_x4_hd_buf,_x4_hd_known,_x4_full_toggle
+		-sEXPORTED_RUNTIME_METHODS=callMain,FS,WORKERFS,HEAPU8 -sEXPORTED_FUNCTIONS=_main,_x4_set_pad,_x4_set_paused,_x4_set_widescreen,_x4_set_aa,_x4_add_credits,_x4_card,_x4_card_new,_x4_test_save,_x4_hd_enable,_x4_hd_buf,_x4_hd_known,_x4_full_toggle,_x4_voice_dub
 build/wasm/%.o: $(GEN)/%.c runtime/runtime.h | build/wasm
 	$(EMCC) $(CFLAGS) -c $< -o $@
 build/wasm/%.o: runtime/%.c runtime/runtime.h runtime/hd.h | build/wasm

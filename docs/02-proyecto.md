@@ -45,8 +45,8 @@ y la partida para la próxima vez.
 | `X` | saltar (✕) |
 | `C` | disparo / espada (▢) |
 | `V` | △ |
-| `A` / `D` | L1 / R1 (cambiar arma) |
-| `Q` / `E` | L2 / R2 |
+| `A` / `S` | L1 / L2 |
+| `D` / `F` | R1 / R2 |
 | `Enter` | Start |
 | `Shift` | Select |
 | `Tab` | versión Completa (en la selección de personaje) |
@@ -206,7 +206,7 @@ El parpadeo de la esfera de carga del disparo (un frame sí y otro no) es del ju
 
 El botón **Trucos** abre un modal (y pausa el juego) con:
 
-- **Ultimate Armor** (código original): en la selección, sobre X: `Z Z`, `←` ×6, mantener `A`+`E`
+- **Ultimate Armor** (código original): en la selección, sobre X: `Z Z`, `←` ×6, mantener `A`+`F`
   y pulsar `Enter`.
 - **Zero Negro** (código original): sobre Zero: mantener `D`, `→` ×6, soltar `D`, mantener `Z` y
   pulsar `Enter`.

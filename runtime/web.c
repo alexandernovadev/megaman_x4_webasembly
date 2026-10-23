@@ -35,6 +35,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t *x4_card(void) { return memcard; }
 EMSCRIPTEN_KEEPALIVE void x4_card_new(void) { memcard_new(); }
 EMSCRIPTEN_KEEPALIVE void x4_test_save(int on) { card_test_save = on; }
 EMSCRIPTEN_KEEPALIVE void x4_full_toggle(void) { cheat_full_toggle(); }
+EMSCRIPTEN_KEEPALIVE void x4_voice_dub(uint32_t key) { voice_dub(key); }
 
 // HD (ver hd.c y web/hd.js): la página lo activa si su GPU puede y si el servidor local tiene
 // el paquete HD; entonces cada frame se manda como lista de dibujo en vez de como imagen.
@@ -74,9 +75,9 @@ EM_JS(void, js_present, (const uint8_t *rgba, int w, int h, long frame, int vide
 });
 
 // Caja de diálogo en pantalla (voice.c): la página pone su voz y su subtítulo.
-EM_JS(void, js_voice, (uint32_t key), {
+EM_JS(void, js_voice, (uint32_t key, int bottom), {
     if (typeof WorkerGlobalScope === 'undefined') return;
-    postMessage({type: 'voice', key: (key >>> 0).toString(16).padStart(8, '0')});
+    postMessage({type: 'voice', key: (key >>> 0).toString(16).padStart(8, '0'), bottom: !!bottom});
 });
 
 // Selección de personaje y modo Completo (cheats.c), para el aviso de la página.
@@ -111,7 +112,7 @@ void frame_hook(long frame) {
     if (memcard_dirty) { memcard_dirty = 0; js_card_save(memcard, sizeof memcard); }
     static uint32_t last_voice;
     uint32_t vk = voice_frame();
-    if (vk != last_voice) { last_voice = vk; js_voice(vk); }
+    if (vk != last_voice) { last_voice = vk; js_voice(vk, voice_bottom()); }
     static int last_cheat = -1;
     int cs = cheat_state();
     if (cs != last_cheat) { last_cheat = cs; js_cheat_state(cs); }

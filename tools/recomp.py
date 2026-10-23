@@ -56,6 +56,7 @@ HOOKS = {
     0x8001a9ec: 'card_hook_menu',          # menú de cargar (atajo de prueba: abre el de guardar)
     0x80029a48: 'cheat_hook_select',       # selección de personaje, cursor en X
     0x80029bd8: 'cheat_hook_select',       # selección de personaje, cursor en Zero
+    0x8001540c: 'voice_hook_sound',        # efecto de sonido: sin pitido de letras si la caja tiene voz
     0x80035240: 'cheat_hook_player',       # inicio del jugador al empezar un nivel (modo Completo)
 }
 

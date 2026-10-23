@@ -12,8 +12,9 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  body { display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 14px; }
-  #screen { position: relative; width: min(100%, calc((100vh - 138px) * 4 / 3));
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 16px; }
+  #screen { position: relative; width: min(100%, calc((100vh - 32px) * 4 / 3));
+    max-width: 100%; min-width: 0; flex: none;
     aspect-ratio: 4 / 3; background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   canvas { width: 100%; height: 100%; display: block; }
   select { font: inherit; color: var(--text); background: #1f2533; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
@@ -25,10 +26,7 @@
     border-radius: 6px; padding: 6px 14px; cursor: pointer; }
   button.btn, label.btn { background: var(--accent); color: #04121f; border: 0; font-weight: 600; padding: 10px 18px; }
   #resume:not([hidden]) + label.btn { background: #1f2533; color: var(--text); border: 1px solid var(--line); font-weight: 400; padding: 6px 14px; }
-  #bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
-    color: var(--muted); font-size: 13px; width: min(100%, 960px); }
-  #status { flex: 1; min-width: 200px; }
-  #keys { color: var(--muted); font-size: 13px; text-align: center; }
+  #status { color: var(--muted); font-size: 13px; min-height: 1.5em; }
   kbd { background: #1f2533; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
     padding: 0 5px; font: 12px ui-monospace, monospace; color: var(--text); }
   #badge { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); pointer-events: none;
@@ -51,6 +49,91 @@
   dialog ul { padding-left: 20px; }
   dialog li b, dialog p b { color: var(--text); }
   dialog .close { float: right; }
+  /* Botón flotante y panel de información (controles, trucos, voces). */
+  #fab { position: fixed; right: 20px; bottom: 20px; z-index: 20; width: 56px; height: 56px; border-radius: 50%;
+    padding: 0; border: 0; display: grid; place-items: center; color: #fff; cursor: pointer;
+    background: radial-gradient(circle at 30% 25%, #6cc4ff, #1d6fd6 60%, #0f3f8f);
+    box-shadow: 0 8px 24px rgba(20, 110, 230, .45), inset 0 1px 0 rgba(255, 255, 255, .35);
+    transition: transform .2s cubic-bezier(.2, .9, .3, 1.3), box-shadow .2s; }
+  #fab:hover { transform: translateY(-2px) scale(1.06); box-shadow: 0 12px 30px rgba(20, 110, 230, .6), inset 0 1px 0 rgba(255, 255, 255, .35); }
+  #fab:active { transform: scale(.95); }
+  #fab svg { width: 28px; height: 28px; }
+  #fab::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #6cc4ff;
+    animation: fabping 2.4s ease-out infinite; pointer-events: none; }
+  #fab.seen::after { display: none; }
+  @keyframes fabping { 0% { transform: scale(1); opacity: .7; } 70%, 100% { transform: scale(1.6); opacity: 0; } }
+  #screen:fullscreen ~ #fab { display: none; }
+
+  #menu { width: min(640px, calc(100vw - 24px)); max-height: min(720px, calc(100vh - 24px)); padding: 0;
+    border: 1px solid #2c3550; border-radius: 18px; overflow: hidden; color: var(--text);
+    background: linear-gradient(180deg, #171c2b, #10141f); box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+    position: fixed; inset: auto 20px 88px auto; margin: 0; transform-origin: bottom right; }
+  #menu[open] { display: flex; flex-direction: column; animation: menuin .32s cubic-bezier(.2, .9, .3, 1.15); }
+  #menu.closing { animation: menuout .2s ease-in forwards; }
+  #menu::backdrop { background: rgba(4, 7, 14, .55); backdrop-filter: blur(4px); animation: fadein .3s; }
+  #menu.closing::backdrop { animation: fadeout .2s forwards; }
+  @keyframes menuin { from { opacity: 0; transform: translateY(16px) scale(.92); } to { opacity: 1; transform: none; } }
+  @keyframes menuout { to { opacity: 0; transform: translateY(12px) scale(.94); } }
+  @keyframes fadein { from { opacity: 0; } }
+  @keyframes fadeout { to { opacity: 0; } }
+  @media (max-width: 700px) { #menu { inset: auto 12px 84px 12px; width: auto; } }
+
+  .m-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px;
+    background: radial-gradient(120% 140% at 0% 0%, rgba(63, 167, 255, .18), transparent 60%); }
+  .m-logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none;
+    background: linear-gradient(135deg, #3fa7ff, #1747a6); font-weight: 800; letter-spacing: -.02em; color: #fff; }
+  .m-head h2 { margin: 0; font-size: 18px; line-height: 1.2; }
+  .m-head .sub { color: var(--muted); font-size: 12.5px; }
+  .m-x { margin-left: auto; width: 34px; height: 34px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(255, 255, 255, .06); border: 1px solid transparent; font-size: 18px; line-height: 1; }
+  .m-x:hover { background: rgba(255, 255, 255, .12); }
+
+  .m-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 20px 14px; }
+  .m-actions button, .m-actions a { display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 8px; border-radius: 12px; font-size: 13.5px; color: var(--text); text-decoration: none;
+    background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .07); transition: background .15s, transform .15s; }
+  .m-actions button:hover, .m-actions a:hover { background: rgba(63, 167, 255, .16); transform: translateY(-1px); }
+  .m-actions svg { width: 17px; height: 17px; flex: none; }
+  .m-actions button:disabled { opacity: .4; pointer-events: none; }
+
+  .m-tabs { display: flex; gap: 4px; margin: 0 20px; padding: 4px; border-radius: 12px; background: rgba(0, 0, 0, .3); }
+  .m-tabs button { flex: 1; border: 0; background: none; color: var(--muted); border-radius: 9px; padding: 7px 6px; font-size: 13.5px; }
+  .m-tabs button[aria-selected="true"] { background: #232b40; color: var(--text); box-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset; }
+  .m-body { overflow-y: auto; padding: 16px 20px 20px; }
+  .m-pane { animation: panein .25s ease; }
+  .m-pane[hidden] { display: none; }
+  @keyframes panein { from { opacity: 0; transform: translateY(6px); } }
+  .m-pane h3 { margin: 16px 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .m-pane h3:first-child { margin-top: 0; }
+  .m-pane p { margin: 6px 0; color: var(--muted); font-size: 14px; }
+  .m-pane b { color: var(--text); }
+
+  .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .key { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px;
+    background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06); font-size: 13.5px; }
+  .key .what { flex: 1; }
+  .key.wide { grid-column: span 2; }
+  .key .ps { color: var(--muted); font-size: 15px; width: 18px; text-align: center; }
+  .cap { min-width: 30px; height: 28px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: 7px;
+    font: 600 12px ui-monospace, monospace; color: var(--text); background: linear-gradient(#2a3247, #1c2232);
+    border: 1px solid #39435d; border-bottom-width: 3px; }
+  .cap + .cap { margin-left: -4px; }
+
+  .card { padding: 14px 16px; border-radius: 14px; margin-bottom: 10px;
+    background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .06); }
+  .card.gold { background: linear-gradient(135deg, rgba(232, 182, 49, .14), rgba(232, 182, 49, .03)); border-color: rgba(232, 182, 49, .35); }
+  .card h4 { margin: 0 0 6px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .card .tag { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: rgba(255, 255, 255, .08); color: var(--muted); }
+  .card.gold .tag { background: rgba(232, 182, 49, .2); color: #ffd75e; }
+  .card ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .card .steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+  .m-foot { display: flex; justify-content: space-between; gap: 10px; padding: 10px 20px; font-size: 12px;
+    color: var(--muted); border-top: 1px solid rgba(255, 255, 255, .06); background: rgba(0, 0, 0, .2); }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; z-index: 30;
+    padding: 9px 16px; border-radius: 10px; background: #1f2638; border: 1px solid #323c56; font-size: 13.5px;
+    transition: opacity .25s, transform .25s; pointer-events: none; max-width: calc(100vw - 32px); }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
   #screen:fullscreen { width: 100vw !important; height: 100vh !important; aspect-ratio: auto !important; border: 0; border-radius: 0; }
 </style>
 </head>
@@ -65,51 +148,110 @@
     </label>
     <p>O arrástralo aquí. Necesitas tu propia copia del disco en formato <code>.bin</code> (2352 bytes por sector).
       Se lee desde tu equipo, en tu navegador: no se sube a ningún sitio.</p>
+    <p id="dropstatus"></p>
   </div>
   <div id="badge" hidden></div>
   <div id="subs" hidden></div>
 </div>
 
-<div id="bar">
-  <span id="status">Cargando el motor…</span>
-  <span id="fps"></span>
-  <button id="pause" disabled>Pausa (P)</button>
-  <button id="full">Pantalla completa (⌘+Enter)</button>
-  <button id="tricks">Trucos</button>
-</div>
+<button id="fab" title="Controles, trucos e información (M)" aria-label="Abrir información">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6l-.7 6.9A3 3 0 0 0 5 19c1 0 1.9-.5 2.5-1.3L9 16h6l1.5 1.7A3.2 3.2 0 0 0 19 19a3 3 0 0 0 3-3.5l-.7-6.9a4 4 0 0 0-4-3.6Z"/>
+  </svg>
+</button>
 
-<dialog id="trickbox">
-  <button class="close" id="trickclose">Cerrar</button>
-  <h2>Trucos</h2>
-  <p>Todos se hacen en la pantalla <b>PLAYER SELECT</b>, al empezar una partida nueva.</p>
+<dialog id="menu" aria-label="Información">
+  <div class="m-head">
+    <div class="m-logo">X4</div>
+    <div>
+      <h2>Mega Man X4</h2>
+      <div class="sub">WebAssembly · tu disco, en tu navegador</div>
+    </div>
+    <button class="m-x" id="menuclose" aria-label="Cerrar">×</button>
+  </div>
+  <div class="m-actions">
+    <button id="pause" disabled>
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+      <span>Pausa</span></button>
+    <button id="full">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      <span>Pantalla completa</span></button>
+    <a href="/grabar" target="_blank">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span>Grabar voces</span></a>
+  </div>
+  <div class="m-tabs" role="tablist">
+    <button role="tab" data-pane="controls" aria-selected="true">Controles</button>
+    <button role="tab" data-pane="tricks" aria-selected="false">Trucos</button>
+    <button role="tab" data-pane="about" aria-selected="false">Voces e info</button>
+  </div>
+  <div class="m-body">
+    <section class="m-pane" id="pane-controls">
+      <h3>Teclado</h3>
+      <div class="keys">
+        <div class="key wide"><span class="cap">↑</span><span class="cap">↓</span><span class="cap">←</span><span class="cap">→</span><span class="what">Mover</span></div>
+        <div class="key"><span class="cap">X</span><span class="what">Saltar</span><span class="ps">✕</span></div>
+        <div class="key"><span class="cap">C</span><span class="what">Disparo / espada</span><span class="ps">▢</span></div>
+        <div class="key"><span class="cap">Z</span><span class="what">Dash</span><span class="ps">◯</span></div>
+        <div class="key"><span class="cap">V</span><span class="what">Especial</span><span class="ps">△</span></div>
+        <div class="key"><span class="cap">A</span><span class="cap">S</span><span class="what">L1 / L2</span></div>
+        <div class="key"><span class="cap">D</span><span class="cap">F</span><span class="what">R1 / R2</span></div>
+        <div class="key"><span class="cap">Enter</span><span class="what">Start</span></div>
+        <div class="key"><span class="cap">Shift</span><span class="what">Select</span></div>
+      </div>
+      <h3>Atajos</h3>
+      <div class="keys">
+        <div class="key"><span class="cap">P</span><span class="what">Pausa</span></div>
+        <div class="key"><span class="cap">⌘</span><span class="cap">Enter</span><span class="what">Pantalla completa</span></div>
+        <div class="key"><span class="cap">M</span><span class="what">Este panel</span></div>
+        <div class="key"><span class="cap">Tab</span><span class="what">Modo Completo</span></div>
+      </div>
+      <p style="margin-top:14px">🎮 También funciona con cualquier mando: conéctalo y pulsa un botón.</p>
+    </section>
 
-  <h3>Versión Completa (X o Zero)</h3>
-  <p>Con el cursor sobre X o Zero, pulsa <kbd>Tab</kbd>. Abajo aparece el aviso dorado; vuelve a
-    pulsar <kbd>Tab</kbd> para quitarlo. Después elige el personaje como siempre. Empiezas como si ya
-    hubieras recogido todo, pero con los 8 jefes por vencer:</p>
-  <ul>
-    <li><b>X Completo:</b> la Ultimate Armor (Nova Strike sin límite, disparo de plasma, planeo y
-      menos daño), las 8 armas, la vida al máximo y los 4 tanques llenos.</li>
-    <li><b>Zero Completo:</b> Zero Negro, las 8 técnicas, la vida al máximo y los 4 tanques llenos.</li>
-  </ul>
-  <p>Se guarda con la partida: al cargarla sigues teniéndolo todo.</p>
+    <section class="m-pane" id="pane-tricks" hidden>
+      <p style="margin-top:0">Todos se hacen en la pantalla <b>PLAYER SELECT</b>, al empezar una partida nueva.</p>
+      <div class="card gold">
+        <h4>★ Versión Completa <span class="tag">nuestro</span></h4>
+        <p>Con el cursor sobre X o Zero pulsa <span class="cap">Tab</span>. Sale un aviso dorado (otra vez <span class="cap">Tab</span> lo quita). Empiezas con todo recogido y los 8 jefes por vencer:</p>
+        <ul>
+          <li><b>X:</b> Ultimate Armor (Nova Strike, plasma, planeo), las 8 armas, vida al máximo y 4 tanques llenos.</li>
+          <li><b>Zero:</b> Zero Negro, las 8 técnicas, vida al máximo y 4 tanques llenos.</li>
+        </ul>
+        <p>Se guarda con la partida.</p>
+      </div>
+      <div class="card">
+        <h4>Ultimate Armor <span class="tag">código original</span></h4>
+        <p>Cursor sobre X. Solo da la armadura.</p>
+        <div class="steps"><span class="cap">Z</span><span class="cap">Z</span> · <span class="cap">←</span> ×6 · mantén <span class="cap">A</span>+<span class="cap">F</span> y pulsa <span class="cap">Enter</span></div>
+      </div>
+      <div class="card">
+        <h4>Zero Negro <span class="tag">código original</span></h4>
+        <p>Cursor sobre Zero. Solo cambia el color.</p>
+        <div class="steps">mantén <span class="cap">D</span> · <span class="cap">→</span> ×6 · suelta <span class="cap">D</span> · mantén <span class="cap">Z</span> y pulsa <span class="cap">Enter</span></div>
+      </div>
+    </section>
 
-  <h3>Ultimate Armor (código original del juego)</h3>
-  <p>Cursor sobre X: <kbd>Z</kbd> <kbd>Z</kbd>, <kbd>←</kbd> 6 veces, y luego mantén
-    <kbd>A</kbd> + <kbd>E</kbd> mientras pulsas <kbd>Enter</kbd>.</p>
-  <p>Solo da la armadura: las armas, los corazones y los tanques hay que conseguirlos.</p>
-
-  <h3>Zero Negro (código original del juego)</h3>
-  <p>Cursor sobre Zero: mantén <kbd>D</kbd> y pulsa <kbd>→</kbd> 6 veces; suelta <kbd>D</kbd>,
-    mantén <kbd>Z</kbd> y pulsa <kbd>Enter</kbd>.</p>
-  <p>Solo cambia el color: Zero se juega igual.</p>
+    <section class="m-pane" id="pane-about" hidden>
+      <div class="card">
+        <h4>🎙️ Voces en español</h4>
+        <p>El primer nivel entero está doblado, en las rutas de X y de Zero. Mientras habla un personaje, la música baja y un subtítulo tapa la caja en inglés.</p>
+        <p>Las voces imitan grabaciones hechas en la página <a href="/grabar" target="_blank" style="color: var(--accent)">Grabar voces</a>.</p>
+      </div>
+      <div class="card">
+        <h4>🔒 Tu disco se queda en tu equipo</h4>
+        <p>El juego se lee desde tu copia de <b>Mega Man X4 (USA)</b>, en tu navegador. No se sube a ningún sitio. Las partidas se guardan en el navegador como una tarjeta de memoria.</p>
+      </div>
+      <div class="card">
+        <h4>⚙️ Cómo funciona</h4>
+        <p>El ejecutable de PlayStation está recompilado de MIPS a C y a WebAssembly. Va con gráficos mejorados, panorámica 16:9 y suavizado.</p>
+      </div>
+    </section>
+  </div>
+  <div class="m-foot"><span id="status">Cargando el motor…</span><span id="fps"></span></div>
 </dialog>
 
-<div id="keys">
-  <kbd>↑↓←→</kbd> mover · <kbd>Z</kbd> dash (◯) · <kbd>X</kbd> saltar (✕) · <kbd>C</kbd> disparo/espada (▢) · <kbd>V</kbd> △ ·
-  <kbd>A</kbd>/<kbd>D</kbd> L1/R1 · <kbd>Q</kbd>/<kbd>E</kbd> L2/R2 · <kbd>Enter</kbd> Start ·
-  <kbd>Shift</kbd> Select · o un mando · <kbd>Tab</kbd> versión Completa (en la selección de personaje)
-</div>
+<div id="toast" role="status"></div>
 
 <script src="anime4k.js"></script>
 <script src="scalefx.js"></script>
@@ -122,7 +264,7 @@ const KEYS = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   // Como en la versión de PC: Z dash, X salto, C disparo/espada (controles por defecto de PS1).
   KeyZ: 'circle', KeyX: 'cross', KeyC: 'square', KeyV: 'triangle',
-  KeyA: 'l1', KeyD: 'r1', KeyQ: 'l2', KeyE: 'r2',
+  KeyA: 'l1', KeyS: 'l2', KeyD: 'r1', KeyF: 'r2',
   Enter: 'start', ShiftLeft: 'select', ShiftRight: 'select',
 };
 // Mapeo "standard" de la Gamepad API.
@@ -139,12 +281,25 @@ renderer.setEnhanceVideo(true);
 try { for (const k of ['x4-filter', 'x4-vidfx', 'x4-wide', 'x4-aa']) localStorage.removeItem(k); } catch {}
 function applyWide() {
   $('screen').style.aspectRatio = '16 / 9';
-  $('screen').style.width = 'min(100%, calc((100vh - 138px) * 16 / 9))';
+  $('screen').style.width = 'min(100%, calc((100vh - 32px) * 16 / 9))';
   if (typeof worker !== 'undefined') worker.postMessage({ type: 'wide', on: true });
 }
 function applyAA() { if (typeof worker !== 'undefined') worker.postMessage({ type: 'aa', on: true }); }
 new ResizeObserver(() => renderer.redraw()).observe(canvas);
-const status = (t) => { $('status').textContent = t; };
+// El estado sale en el panel y en la pantalla de inicio; jugando, los errores salen en un aviso.
+let toastTimer = 0;
+function toast(t) {
+  const el = $('toast');
+  el.textContent = t;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 4000);
+}
+const status = (t) => {
+  $('status').textContent = t;
+  $('dropstatus').textContent = t;
+  if (started && /^(Error|No se|EXE|FATAL|El juego terminó)/.test(t)) toast(t);
+};
 
 // Audio: el worker manda bloques PCM de 16 bits estéreo a 44,1 kHz; un AudioWorklet los
 // encola. Se mantiene poca latencia descartando lo más viejo si la cola crece demasiado.
@@ -244,7 +399,7 @@ worker.onmessage = (e) => {
     perfNote(t, performance.now() - t);
     frames++; lastFrame = m.frame;
   } else if (m.type === 'voice') {
-    showVoice(m.key);
+    showVoice(m.key, m.bottom);
   } else if (m.type === 'cheat') {
     showCheat(m.state);
   } else if (m.type === 'ready') {
@@ -269,7 +424,7 @@ async function launch(file) {
   const testSave = new URLSearchParams(location.search).has('probar-guardado');
   // HD: si la GPU puede y el servidor local tiene el paquete HD (tools/serve.py). ?sin-hd lo apaga (pruebas).
   const hd = renderer.hd && !new URLSearchParams(location.search).has('sin-hd') ? await renderer.hd.config() : { on: false, capture: false, known: new Uint32Array(0) };
-  worker.postMessage({ type: 'start', file, card: await dbGet('card0'), testSave, hd });
+  worker.postMessage({ type: 'start', file, card: await dbGet('card0'), testSave, hd, dub: Object.keys(voiceIndex) });
 }
 // `remember`: el handle del archivo (Chrome/Edge) o el propio File para la próxima visita.
 function start(file, remember) {
@@ -333,7 +488,7 @@ function togglePause() {
   worker.postMessage({ type: 'pause', paused });
   if (audioCtx) paused ? audioCtx.suspend() : audioCtx.resume();
   if (voiceAudio && !voiceAudio.ended) paused ? voiceAudio.pause() : voiceAudio.play().catch(() => {});
-  $('pause').textContent = paused ? 'Seguir (P)' : 'Pausa (P)';
+  $('pause').querySelector('span').textContent = paused ? 'Seguir' : 'Pausa';
 }
 $('pause').onclick = togglePause;
 const fullscreen = () => document.fullscreenElement ? document.exitFullscreen() : $('screen').requestFullscreen();
@@ -343,10 +498,16 @@ $('full').onclick = fullscreen;
 // diálogo nueva con la huella de su texto. Si está doblada, suena su audio y su subtítulo tapa
 // la caja en inglés (en píxeles de la PS1: x 37-283, y 25-94).
 let voiceIndex = {}, voiceAudio = null, voiceKey = '00000000';
-fetch('voice/index.json').then((r) => r.ok ? r.json() : {}).then((j) => { voiceIndex = j; }).catch(() => {});
+// Las cajas con voz también se le dicen al juego, para que no suene el pitido de las letras.
+fetch('voice/index.json').then((r) => r.ok ? r.json() : {}).then((j) => {
+  voiceIndex = j;
+  if (started) worker.postMessage({ type: 'dub', keys: Object.keys(j) });
+}).catch(() => {});
+// La caja del juego: arriba (y 25) o abajo (y 137 en los niveles), según el mensaje.
+let subsBottom = false;
 function placeSubs() {
   const g = renderer.geometry(), sx = g.w / (g.fw || 320), sy = g.h / (g.fh || 240), el = $('subs');
-  Object.assign(el.style, { left: `${g.x + (37 + g.margin) * sx}px`, top: `${g.y + 25 * sy}px`,
+  Object.assign(el.style, { left: `${g.x + (37 + g.margin) * sx}px`, top: `${g.y + (subsBottom ? 137 : 25) * sy}px`,
     width: `${246 * sx}px`, height: `${69 * sy}px`, fontSize: `${10.5 * sy}px` });
 }
 // Mientras habla un personaje, la música y los efectos bajan al 30%.
@@ -357,8 +518,9 @@ function stopVoice() {
   if (voiceAudio) { voiceAudio.pause(); voiceAudio = null; }
   duck(false);
 }
-function showVoice(key) {
+function showVoice(key, bottom) {
   voiceKey = key;
+  subsBottom = !!bottom;
   const e = voiceIndex[key], el = $('subs');
   if (!e) {
     el.hidden = true;
@@ -394,22 +556,42 @@ function showCheat(state) {
     : 'Tab: versión Completa (todo recogido)';
 }
 
-// Trucos: el juego se pausa mientras está abierto.
-let pausedByTricks = false;
-$('tricks').onclick = () => {
-  if (started && !paused) { togglePause(); pausedByTricks = true; }
+// Panel de información (botón flotante o tecla M): el juego se pausa mientras está abierto.
+let pausedByMenu = false;
+function openMenu() {
+  const m = $('menu');
+  if (m.open) return;
+  if (started && !paused) { togglePause(); pausedByMenu = true; }
   keyBits = 0;
-  $('trickbox').showModal();
-};
-$('trickclose').onclick = () => $('trickbox').close();
-$('trickbox').addEventListener('close', () => {
-  if (pausedByTricks && paused) togglePause();
-  pausedByTricks = false;
-  $('tricks').blur();  // si no, Enter (Start) volvería a abrirlo
+  $('fab').classList.add('seen');
+  try { localStorage.setItem('x4-menu-seen', '1'); } catch {}
+  m.showModal();
+}
+function closeMenu() {
+  const m = $('menu');
+  if (!m.open || m.classList.contains('closing')) return;
+  m.classList.add('closing');
+  setTimeout(() => { m.classList.remove('closing'); m.close(); }, 190);
+}
+try { if (localStorage.getItem('x4-menu-seen')) $('fab').classList.add('seen'); } catch {}
+if (location.hash === '#info') openMenu();
+$('fab').onclick = openMenu;
+$('menuclose').onclick = closeMenu;
+$('menu').addEventListener('cancel', (e) => { e.preventDefault(); closeMenu(); });
+$('menu').addEventListener('click', (e) => { if (e.target === $('menu')) closeMenu(); });  // clic fuera
+$('menu').addEventListener('close', () => {
+  if (pausedByMenu && paused) togglePause();
+  pausedByMenu = false;
+  $('fab').blur();  // si no, Enter (Start) volvería a abrirlo
+});
+document.querySelectorAll('.m-tabs button').forEach((tab) => tab.onclick = () => {
+  document.querySelectorAll('.m-tabs button').forEach((t) => t.setAttribute('aria-selected', t === tab));
+  document.querySelectorAll('.m-pane').forEach((p) => { p.hidden = p.id !== 'pane-' + tab.dataset.pane; });
 });
 
 addEventListener('keydown', (e) => {
-  if ($('trickbox').open) return;
+  if ($('menu').open) return;
+  if (e.code === 'KeyM') { openMenu(); return; }
   if (e.code === 'Tab') { e.preventDefault(); if (started) worker.postMessage({ type: 'full' }); return; }
   if (e.code === 'KeyP' || e.code === 'Escape' && !document.fullscreenElement) { togglePause(); return; }
   // ⌘+Enter (Ctrl+Enter fuera de Mac): pantalla completa, sin pulsar Start.
@@ -451,7 +633,7 @@ function poll(t) {
 requestAnimationFrame(poll);
 
 setInterval(() => {
-  if (started) $('fps').textContent = paused ? 'en pausa' : `${frames} fps · frame ${lastFrame}`;
+  if (started) $('fps').textContent = paused ? 'en pausa' : `${frames} fps`;
   frames = 0;
 }, 1000);
 </script>

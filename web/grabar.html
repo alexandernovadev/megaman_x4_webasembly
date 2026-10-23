@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grabar voces</title>
+<!-- Grabaciones de referencia para las voces en español (ver tools/voice/README.md): cada texto se
+     graba en WAV en el navegador y tools/serve.py lo guarda en voice_refs/ (local, no se sube). -->
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #151924; --line: #262c3b; --text: #e6e9f0; --muted: #8a93a8;
+    --accent: #3fa7ff; --rec: #ff4d5e; --ok: #45d483; --tip: #ffd75e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  .tips { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px;
+    margin: 16px 0; }
+  .tips ul { margin: 6px 0 0; padding-left: 20px; }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 12px; }
+  nav button { font: inherit; color: var(--text); background: #1f2533; border: 1px solid var(--line);
+    border-radius: 999px; padding: 6px 16px; cursor: pointer; }
+  nav button[aria-pressed="true"] { background: var(--accent); color: #04121f; border-color: var(--accent); font-weight: 600; }
+  nav .count { opacity: .75; font-size: 13px; margin-left: 4px; }
+  .who { color: var(--muted); margin: 0 0 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 12px; }
+  .card.done { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+  .for { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: #04121f; background: var(--accent); border-radius: 4px; padding: 1px 8px; margin-bottom: 8px; }
+  .card .text { font-size: 19px; line-height: 1.45; margin: 0 0 8px; }
+  .tip { display: inline-block; color: var(--tip); background: rgba(255, 215, 94, .08);
+    border: 1px solid rgba(255, 215, 94, .3); border-radius: 6px; padding: 2px 10px; font-size: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .row button { font: inherit; border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
+    background: #1f2533; color: var(--text); }
+  .row button.rec { background: var(--rec); border-color: var(--rec); color: #fff; font-weight: 600; }
+  .row button.rec.on { animation: blink 1s infinite; }
+  .row button:disabled { opacity: .45; cursor: default; }
+  @keyframes blink { 50% { opacity: .6; } }
+  .meter { flex: 1; min-width: 80px; height: 8px; background: #0f121a; border-radius: 4px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .05s; }
+  .meter i.hot { background: var(--rec); }
+  .state { font-size: 13px; color: var(--muted); min-width: 9ch; }
+  .state.ok { color: var(--ok); }
+  #err { color: var(--rec); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Grabar voces</h1>
+  <p class="muted">Voces de referencia para doblar el juego al español. Cada grabación se guarda en la carpeta
+    <code>voice_refs/</code> del proyecto, en tu equipo. Nada se sube. <a href="/">Volver al juego</a></p>
+
+  <div class="tips">
+    <b>Antes de grabar</b>
+    <ul>
+      <li>Busca un sitio en silencio, sin ventilador ni música.</li>
+      <li>Ponte a un palmo del micrófono, siempre a la misma distancia.</li>
+      <li>Lee el texto una vez en voz alta antes de grabar. Luego pulsa <b>Grabar</b>, espera medio segundo y habla.</li>
+      <li>Cada texto dura entre 6 y 12 segundos. Si te equivocas, vuelve a grabar: se reemplaza.</li>
+      <li>La barra verde muestra el volumen. Si se pone roja, estás demasiado cerca o hablas demasiado fuerte.</li>
+      <li>Actúa sin miedo. La voz sale tal cual la grabes: con emoción, con emoción; sin ella, plana.</li>
+    </ul>
+  </div>
+
+  <p id="err" hidden></p>
+  <nav id="tabs"></nav>
+  <p class="who" id="who"></p>
+  <section id="list"></section>
+</main>
+
+<script>
+const VOICES = [
+  { id: 'x', name: 'X', who: 'Joven, decidido y amable. Un héroe que no quiere pelear, pero lo hace por los demás.', lines: [
+    { text: 'Soy X, cazador de Mavericks. No me gusta pelear, pero si tengo que hacerlo para proteger a la gente, lo haré.',
+      tip: 'Normal: tranquilo, como si te presentaras. Voz clara, sin forzar.' },
+    { text: '¡Entendido! ¡Voy en camino! ¡No voy a dejar que destruyan la ciudad!',
+      tip: 'Fuerte: con energía, como en plena batalla. Casi gritando, pero sin romper la voz.' },
+    { text: 'Zero... ¿de verdad tenía que terminar así? A veces me pregunto si todo esto vale la pena.',
+      tip: 'Suave: triste, despacio, casi en voz baja.' },
+    { text: 'Si la Repliforce quiere una guerra, la voy a detener. Pase lo que pase, seguiré adelante.',
+      tip: 'Firme: seguro de ti mismo, voz media, sin prisa.' },
+    { text: 'Tranquilo, ya estás a salvo. Ahora vete, yo me encargo de todo lo demás.',
+      tip: 'Amable: cálido, con una sonrisa al hablar.' },
+  ]},
+  { id: 'zero', name: 'Zero', who: 'Grave, frío y seguro. Habla poco y sin dudar.', lines: [
+    { text: 'Soy Zero. No necesito que nadie me diga qué es lo correcto. Yo decido por qué peleo.',
+      tip: 'Normal: grave y tranquilo. Habla desde el pecho, sin prisa.' },
+    { text: '¿La Repliforce? ... Bien. Voy para allá. Esto no va a durar mucho.',
+      tip: 'Seco: seguro, con una pausa en los puntos suspensivos.' },
+    { text: '¡Apártate! ¡Este combate es mío! ¡No pienso perder contra alguien como tú!',
+      tip: 'Fuerte: decidido y con rabia contenida. Voz grave aunque grites.' },
+    { text: 'Iris... lo siento. No pude protegerte. Perdóname.',
+      tip: 'Suave: dolido, muy bajo, despacio.' },
+    { text: 'Escucha bien, X. Si algún día pierdo el control, no dudes ni un segundo. Detenme.',
+      tip: 'Serio: voz baja pero firme, mirando a los ojos.' },
+  ]},
+  { id: 'iris', name: 'Iris', who: 'La hermana del Coronel, amiga de Zero. Dulce, joven y preocupada por los demás.', lines: [
+    { text: 'Zero, ¿eres tú? Qué alivio verte. Tenía mucho miedo de que te hubiera pasado algo.',
+      tip: 'Linda: dulce y aliviada, con una sonrisa.' },
+    { text: 'Por favor, no peleen. Mi hermano y tú no tienen por qué ser enemigos.',
+      tip: 'Suave: suplicando, con la voz un poco temblorosa.' },
+    { text: '¡Zero, cuidado! ¡Hay algo enorme acercándose por detrás!',
+      tip: 'Fuerte: asustada, avisando con urgencia.' },
+    { text: 'Ojalá existiera un mundo solo para los reploides. Un lugar donde nadie tuviera que sufrir.',
+      tip: 'Soñadora: tranquila y algo triste, despacio.' },
+  ]},
+  { id: 'dragoon', name: 'Magma Dragoon', who: 'Guerrero de fuego, orgulloso y salvaje. Solo vive para pelear contra los más fuertes.', lines: [
+    { text: 'Así que tú eres el famoso cazador. Llevo mucho tiempo esperando pelear contra alguien como tú.',
+      tip: 'Normal: grave y desafiante, con una sonrisa de superioridad.' },
+    { text: '¡Ja, ja, ja! ¡Eso es! ¡Muéstrame todo tu poder! ¡No te contengas!',
+      tip: 'Fuerte: risa salvaje y emocionada, a todo pulmón.' },
+    { text: 'No me importan los Mavericks ni la Repliforce. Solo quiero saber quién es el más fuerte.',
+      tip: 'Rudo: voz rasposa, tranquilo pero intenso.' },
+    { text: 'Hmm... impresionante. Nadie me había hecho sentir así en una pelea.',
+      tip: 'Satisfecho: grave y lento, casi en susurro.' },
+  ]},
+  { id: 'coronel', name: 'Coronel', who: 'El jefe de la Repliforce. Voz grave de militar: orgulloso, serio y de pocas palabras.', lines: [
+    { text: 'Soy el Coronel de la Repliforce. No somos Mavericks. Solo luchamos por nuestro honor.',
+      tip: 'Normal: grave, lento y con autoridad, como un general.' },
+    { text: '¡Repliforce, adelante! ¡Que nadie se atreva a detenernos!',
+      tip: 'Fuerte: una orden a todo el ejército. Voz potente desde el pecho.' },
+    { text: 'Zero... eres un guerrero admirable. Lástima que estemos en bandos distintos.',
+      tip: 'Sereno: respetuoso, tranquilo y algo triste.' },
+    { text: 'Si el mundo no nos acepta, crearemos uno propio. Esa es mi decisión.',
+      tip: 'Firme: decidido, sin levantar la voz.' },
+  ]},
+  { id: 'hq', name: 'Cuartel Hunter', who: 'La operadora del cuartel. Clara y profesional. Opcional: puede grabarla otra persona.', lines: [
+    { text: '¡Alerta! Se detectaron Mavericks en el punto cinco, cinco, seis, siete. Todas las unidades, prepárense.',
+      tip: 'Urgente: claro y rápido, como un aviso por radio.' },
+    { text: 'Conexión establecida. Te envío los datos del objetivo. Ten mucho cuidado ahí afuera, ¿sí?',
+      tip: 'Linda: dulce y cercana, con cariño.' },
+    { text: 'Los Mavericks tomaron Sky Lagoon con las armas más avanzadas que existen. Es una situación grave.',
+      tip: 'Seria: profesional, como dando un informe.' },
+  ]},
+];
+
+const MAX_SECONDS = 30;
+const $ = s => document.querySelector(s);
+let saved = {};          // nombre de archivo -> true
+let current = VOICES[0].id;
+let rec = null;          // grabación en curso
+let audioCtx = null, micNode = null, workletReady = null;
+
+function fileName(v, i) { return `${v}_${i + 1}.wav`; }
+
+async function loadSaved() {
+  try {
+    const r = await fetch('/refs/list', { cache: 'no-store' });
+    saved = r.ok ? await r.json() : {};
+  } catch { saved = {}; }
+}
+
+function renderTabs() {
+  const nav = $('#tabs');
+  nav.innerHTML = '';
+  for (const v of VOICES) {
+    const b = document.createElement('button');
+    const n = v.lines.filter((_, i) => saved[fileName(v.id, i)]).length;
+    b.innerHTML = `${v.name}<span class="count">${n}/${v.lines.length}</span>`;
+    b.setAttribute('aria-pressed', v.id === current);
+    b.onclick = () => { if (rec) return; current = v.id; render(); };
+    nav.append(b);
+  }
+}
+
+function render() {
+  renderTabs();
+  const v = VOICES.find(v => v.id === current);
+  $('#who').textContent = v.who;
+  const list = $('#list');
+  list.innerHTML = '';
+  v.lines.forEach((line, i) => {
+    const name = fileName(v.id, i);
+    const card = document.createElement('div');
+    card.className = 'card' + (saved[name] ? ' done' : '');
+    card.innerHTML = `
+      <span class="for"></span>
+      <p class="text"></p>
+      <span class="tip"></span>
+      <div class="row">
+        <button class="rec">Grabar</button>
+        <button class="play" ${saved[name] ? '' : 'disabled'}>Escuchar</button>
+        <div class="meter"><i></i></div>
+        <span class="state ${saved[name] ? 'ok' : ''}">${saved[name] ? 'Guardada ✓' : 'Sin grabar'}</span>
+      </div>`;
+    card.querySelector('.for').textContent = `Voz de ${v.name} · texto ${i + 1}`;
+    card.querySelector('.text').textContent = line.text;
+    card.querySelector('.tip').textContent = '💡 ' + line.tip;
+    card.querySelector('.rec').onclick = () => rec ? stop() : start(card, name);
+    card.querySelector('.play').onclick = () => new Audio(`/refs/${name}?t=${Date.now()}`).play();
+    list.append(card);
+  });
+}
+
+// El micrófono pasa por un AudioWorklet que copia las muestras tal cual (sin compresión) para
+// guardarlas como WAV, que es lo que leen las herramientas de voz.
+const WORKLET = `class Tap extends AudioWorkletProcessor {
+  process(inputs) { const ch = inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
+}
+registerProcessor('tap', Tap);`;
+
+async function mic() {
+  if (audioCtx) return;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+    channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  audioCtx = new AudioContext();
+  const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+  await audioCtx.audioWorklet.addModule(url);
+  micNode = audioCtx.createMediaStreamSource(stream);
+}
+
+async function start(card, name) {
+  try { await mic(); } catch (e) {
+    $('#err').hidden = false;
+    $('#err').textContent = 'No se pudo usar el micrófono: ' + e.message + '. Dale permiso en el navegador y recarga.';
+    return;
+  }
+  await audioCtx.resume();
+  const node = new AudioWorkletNode(audioCtx, 'tap');
+  const chunks = [];
+  const bar = card.querySelector('.meter i'), state = card.querySelector('.state'), btn = card.querySelector('.rec');
+  node.port.onmessage = e => {
+    chunks.push(e.data);
+    let peak = 0;
+    for (const s of e.data) peak = Math.max(peak, Math.abs(s));
+    bar.style.width = Math.min(100, peak * 110) + '%';
+    bar.classList.toggle('hot', peak > 0.95);
+  };
+  micNode.connect(node);
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    const s = (performance.now() - t0) / 1000;
+    state.className = 'state';
+    state.textContent = `● ${s.toFixed(1)} s`;
+    if (s >= MAX_SECONDS) stop();
+  }, 100);
+  btn.textContent = 'Parar';
+  btn.classList.add('on');
+  document.querySelectorAll('.rec').forEach(b => { if (b !== btn) b.disabled = true; });
+  rec = { node, chunks, card, name, timer, bar, state, btn };
+}
+
+async function stop() {
+  const r = rec;
+  rec = null;
+  clearInterval(r.timer);
+  micNode.disconnect(r.node);
+  r.node.port.onmessage = null;
+  r.bar.style.width = '0';
+  r.btn.textContent = 'Grabar';
+  r.btn.classList.remove('on');
+  document.querySelectorAll('.rec').forEach(b => b.disabled = false);
+  const samples = concat(r.chunks);
+  if (samples.length < audioCtx.sampleRate) {
+    r.state.textContent = 'Muy corta, repite';
+    return;
+  }
+  r.state.textContent = 'Guardando…';
+  try {
+    const res = await fetch('/refs/' + r.name, { method: 'POST', body: wav(samples, audioCtx.sampleRate) });
+    if (!res.ok) throw new Error(res.status);
+    saved[r.name] = true;
+    render();
+  } catch (e) {
+    r.state.textContent = 'No se guardó (' + e.message + ')';
+  }
+}
+
+function concat(chunks) {
+  const out = new Float32Array(chunks.reduce((n, c) => n + c.length, 0));
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
+}
+
+function wav(samples, rate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2), d = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) d.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); d.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+  d.setUint32(24, rate, true); d.setUint32(28, rate * 2, true); d.setUint16(32, 2, true); d.setUint16(34, 16, true);
+  str(36, 'data'); d.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++)
+    d.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 0x7fff, true);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+loadSaved().then(render);
+</script>
+</body>
+</html>
