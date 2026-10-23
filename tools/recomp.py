@@ -40,9 +40,9 @@ PATCHES = {
     0x80028e80: 'c->r[4] = c->r[5] + (uint32_t)(-48 - ws_reveal);',
     0x80028f28: 'c->r[4] = c->r[5] + (uint32_t)(-48 - ws_reveal);',
     # Armas de los jefes (0x80172219, que también marca los jefes vencidos): en el modo Completo
-    # el jugador (0x80035240) y el menú de pausa (0x8002FD70) las ven todas (ver cheats.c).
+    # el jugador las recibe todas al empezar cada nivel (0x80035240, ver cheats.c). Ojo: 0x8002FD70
+    # también lee 0x80172219, pero para saber si el jefe del nivel ya está vencido; no se toca.
     0x8003525c: 'c->r[4] = cheat_weapons(RD8(c->r[4] + (uint32_t)8729));',
-    0x8002ff54: 'c->r[2] = cheat_weapons(RD8(c->r[2] + (uint32_t)8729));',
 }
 
 # Ganchos al entrar en una función: `if (gancho(c, dirección)) return;` (1 = ya resuelta).

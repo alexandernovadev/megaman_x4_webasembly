@@ -234,12 +234,20 @@ Al empezar cada nivel, `0x80035240` copia ese estado al jugador (`0x801418C8`).
 
 **La trampa:** en X4, tener el arma de un jefe y haberlo vencido es el mismo bit. Si se dan las 8
 armas ahí, el juego cree que no quedan jefes. Por eso el modo Completo deja `2219` con los jefes de
-verdad y pone una **marca propia** en un bit libre de `221A` (se guarda con la partida). Dos
-parches hacen que el jugador y el menú de pausa vean las 8 armas cuando está la marca.
+verdad y pone una **marca propia** en un bit libre de `221A` (se guarda con la partida). Un
+parche en `0x80035240` da las 8 armas al jugador al empezar cada nivel cuando está la marca.
+Ojo: `0x8002FD70` también lee `2219`, pero para saber si el jefe del nivel ya está vencido; un
+primer parche ahí dejaba a los jefes invencibles y se quitó.
 
 **Otro detalle:** la versión especial decide qué gráficos carga el nivel, así que se pone mientras
 se está en la selección (ganchos en `0x80029A48` y `0x80029BD8`, las rutinas que buscan los códigos)
 y no al empezar el nivel.
+
+**Eregion, el jefe de la introducción:** solo le hace daño la cabeza, y su tabla de daño
+(`0x801066F0`, un par reacción/daño por tipo de ataque; la del cuerpo, `0x801060F0`, lo rebota
+todo) rebota las armas de los jefes, los disparos del brazo de plasma y las técnicas de Zero: en el
+juego original nadie los tiene todavía ahí. Con el modo Completo, mientras se está en ese nivel
+(`21CC` = 0), los tipos que rebotaban hacen 3 de daño. Esa tabla solo la usa el código de Eregion.
 
 ---
 
